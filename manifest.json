@@ -1,0 +1,10 @@
+{
+  "name": "나의 산행기록장",
+  "short_name": "산행기록장",
+  "description": "산행 코스와 사진, 식당과 메뉴까지 기록하는 개인 산행 일지",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#fbfcfa",
+  "theme_color": "#16794b",
+  "lang": "ko-KR"
+}
