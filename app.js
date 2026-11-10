@@ -17,6 +17,8 @@ let isOwner = true;
 let realtimeChannel = null;
 let authMode = 'login';
 let toastTimer = null;
+let hikingMap = null;
+let hikingMapLayer = null;
 
 const DB_NAME = 'my-hiking-journal-v1';
 const DB_STORE = 'records';
@@ -278,6 +280,57 @@ function setNav(nav) {
   $('page-title').textContent = nav === 'restaurant' ? '산행 맛집 기록' : '전체 산행 기록';
   $('page-subtitle').textContent = nav === 'restaurant' ? '산행 후 들른 식당과 먹었던 메뉴를 모아보세요.' : '직접 걸은 길과 그날의 풍경, 하산 후 맛있게 먹은 한 끼까지.';
   renderCards();
+  renderHikingMap();
+}
+
+const MOUNTAIN_COORDS = {
+  '마니산':[37.6285,126.4315], '소요산':[37.9364,127.0872], '태백산':[37.0968,128.9152],
+  '계양산':[37.55,126.724], '청계산':[37.427,127.056], '광교산':[37.329,127.032],
+  '고려산':[37.783,126.424], '함백산':[37.161,128.917], '오대산':[37.798,128.543],
+  '주왕산':[36.389,129.161], '무등산':[35.134,126.988], '감악산':[37.936,126.965],
+  '북한산':[37.658,126.977], '관악산':[37.445,126.964], '도봉산':[37.695,127.015],
+};
+function coordsForRecord(record) {
+  const name = String(record.name || '').replace(/\s/g,'');
+  for (const [key, point] of Object.entries(MOUNTAIN_COORDS)) if (name.includes(key)) return point;
+  return null;
+}
+function renderHikingMap() {
+  const section = $('family-map-section');
+  if (!section) return;
+  section.hidden = activeNav !== 'all';
+  if (activeNav !== 'all') return;
+  if (!window.L) {
+    $('hiking-map').innerHTML = '<div class="map-fallback">지도를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.</div>';
+    return;
+  }
+  if (!hikingMap) {
+    hikingMap = L.map('hiking-map', { scrollWheelZoom:false, zoomControl:true }).setView([36.35,127.75], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom:18, attribution:'&copy; OpenStreetMap'
+    }).addTo(hikingMap);
+    hikingMapLayer = L.layerGroup().addTo(hikingMap);
+    setTimeout(() => hikingMap && hikingMap.invalidateSize(), 180);
+  }
+  hikingMapLayer.clearLayers();
+  const plotted = records.map(record => ({record, point:coordsForRecord(record)})).filter(x => x.point);
+  $('map-count').textContent = `${plotted.length}개 산`;
+  plotted.forEach(({record, point}) => {
+    const photo = heroPhoto(record);
+    const src = photo ? (photo.previewUrl || photo.dataUrl || '') : '';
+    const html = `<button class="map-photo-pin ${src ? '' : 'no-photo'}" type="button" aria-label="${esc(record.name)} 산행 기록 보기">${src ? `<img src="${esc(src)}" alt="">` : '<span class="pin-mountain">▲</span>'}<b>${esc(record.name)}</b></button>`;
+    const icon = L.divIcon({className:'map-photo-marker', html, iconSize:[76,88], iconAnchor:[38,78]});
+    const marker = L.marker(point,{icon}).addTo(hikingMapLayer);
+    marker.on('click', () => openDetail(record.id));
+  });
+  if (plotted.length) {
+    const bounds = L.latLngBounds(plotted.map(x => x.point));
+    if (plotted.length === 1) hikingMap.setView(plotted[0].point, 9);
+    else hikingMap.fitBounds(bounds.pad(0.28), {maxZoom:8});
+  } else {
+    hikingMap.setView([36.35,127.75], 7);
+  }
+  setTimeout(() => hikingMap && hikingMap.invalidateSize(), 80);
 }
 
 function render() {
@@ -289,6 +342,7 @@ function render() {
   $('all-filter-count').textContent = records.length;
   renderRegionChips();
   renderCards();
+  renderHikingMap();
 }
 function renderRegionChips() {
   const counts = {};
@@ -424,16 +478,30 @@ function compressImage(file) {
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
         canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-        const ctx = canvas.getContext('2d', { alpha: false });
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        const keepTransparency = file.type === 'image/png' || file.type === 'image/webp';
+        const ctx = canvas.getContext('2d', { alpha: keepTransparency });
+        if (!keepTransparency) { ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height); }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        let quality = 0.84;
-        let result = canvas.toDataURL('image/jpeg', quality);
-        while (result.length > 2_000_000 && quality > 0.5) {
-          quality -= 0.08;
-          result = canvas.toDataURL('image/jpeg', quality);
+        if (keepTransparency) {
+          let result = canvas.toDataURL('image/png');
+          if (result.length > 3_500_000) {
+            const smaller = document.createElement('canvas');
+            const ratio = Math.sqrt(3_500_000 / result.length);
+            smaller.width = Math.max(1, Math.round(canvas.width * ratio));
+            smaller.height = Math.max(1, Math.round(canvas.height * ratio));
+            smaller.getContext('2d').drawImage(canvas,0,0,smaller.width,smaller.height);
+            result = smaller.toDataURL('image/png');
+          }
+          resolve(result);
+        } else {
+          let quality = 0.84;
+          let result = canvas.toDataURL('image/jpeg', quality);
+          while (result.length > 2_000_000 && quality > 0.5) {
+            quality -= 0.08;
+            result = canvas.toDataURL('image/jpeg', quality);
+          }
+          resolve(result);
         }
-        resolve(result);
       };
       img.src = reader.result;
     };
@@ -507,7 +575,8 @@ async function saveCloudRecord(record, oldRecord) {
   for (const photo of clean.photos) {
     if (photo.dataUrl) {
       const blob = await dataUrlToBlob(photo.dataUrl);
-      const path = `${cloudUser.id}/${record.id}/${photo.id || makeId()}.jpg`;
+      const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+      const path = `${cloudUser.id}/${record.id}/${photo.id || makeId()}.${ext}`;
       const { error } = await cloudClient.storage.from('hike-photos').upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: true });
       if (error) throw error;
       photo.path = path;
