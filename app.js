@@ -541,7 +541,8 @@ function renderCards() {
   $('filter-label').textContent = activeRegion === 'all' ? (activeNav === 'restaurant' ? '식당 기록이 있는 산행' : '모든 산행을 표시합니다') : `${activeRegion} 지역`;
   $('record-grid').innerHTML = list.map((record, listIndex) => {
     const index = listIndex + 1;
-    const photo = heroPhoto(record);
+    // 카드 대표 사진도 지도와 상세 화면처럼 정상 인증 사진을 우선 사용합니다.
+    const photo = mapPhoto(record);
     const numPhotos = (record.photos || []).length;
     const date = record.date ? formatDate(record.date, 'short') : '날짜 미기록';
     const intro = record.course || record.memo || '산행 코스와 후기를 기록해 보세요.';
