@@ -8,11 +8,11 @@
   <title>나의 산행기록장</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20261110-2">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script defer src="app.js"></script>
+  <script defer src="app.js?v=20261110-2"></script>
 </head>
 <body>
   <header class="site-header">
@@ -53,7 +53,7 @@
     <section class="family-map-section" id="family-map-section" aria-label="대한민국 산행 지도">
       <div class="map-heading"><div><p class="eyebrow">OUR FAMILY HIKING MAP</p><h2>우리 가족 산행지도</h2><p>산행한 산의 사진 아이콘을 누르면 그날의 기록을 볼 수 있어요.</p></div><span class="map-count" id="map-count">0개 산</span></div>
       <div id="hiking-map" class="hiking-map" role="application" aria-label="산행 기록 지도"></div>
-      <div class="map-legend"><span><i class="legend-dot"></i> 사진이 등록된 산</span><span>※ 산 위치는 산 이름을 기준으로 표시합니다.</span></div>
+      <div class="map-legend"><span><i class="legend-dot"></i> 정상 인증 사진 우선 표시</span><span>※ 정상 사진이 없으면 기존 산행 사진을 대신 표시합니다.</span></div>
     </section>
 
     <div class="notice-bar" id="storage-notice">
@@ -98,23 +98,27 @@
             <label class="field"><span>지역</span><select id="field-region"><option value="">지역 선택</option><option>서울</option><option>인천</option><option>경기</option><option>강원</option><option>충북</option><option>충남</option><option>대전</option><option>경북</option><option>대구</option><option>경남</option><option>부산</option><option>울산</option><option>전북</option><option>전남</option><option>광주</option><option>제주</option><option>기타</option></select></label>
             <label class="field span-2"><span>산행 코스</span><input id="field-course" maxlength="180" placeholder="예: 함허동천 → 정상 → 함허동천 원점회귀"></label>
             <label class="field"><span>거리 (km)</span><input id="field-distance" type="number" min="0" step="0.1" placeholder="예: 6.5"></label>
-            <label class="field"><span>소요 시간</span><input id="field-duration" maxlength="40" placeholder="예: 3시간 20분"></label>
+            <label class="field"><span>총 소요 시간 (자동 계산)</span><input id="field-duration" maxlength="40" placeholder="출발·하산 시간을 입력하면 자동 계산" readonly aria-describedby="duration-help"></label>
             <label class="field"><span>정상 높이 (m)</span><input id="field-elevation" type="number" min="0" step="1" placeholder="예: 469"></label>
             <label class="field"><span>난이도</span><select id="field-difficulty"><option value="">선택 안 함</option><option>산책 수준</option><option>쉬움</option><option>보통</option><option>어려움</option><option>매우 어려움</option></select></label>
             <label class="field"><span>날씨</span><input id="field-weather" maxlength="40" placeholder="예: 맑음, 바람 조금"></label>
             <label class="field"><span>함께한 사람</span><input id="field-companions" maxlength="100" placeholder="예: 가족, 친구"></label>
             <label class="field"><span>출발 시간</span><input id="field-start" type="time"></label>
-            <label class="field"><span>하산 시간</span><input id="field-end" type="time"></label>
+            <label class="field"><span>하산 완료 시간</span><input id="field-end" type="time"></label><p class="duration-help span-2" id="duration-help">출발 시간과 하산 완료 시간을 입력하면 총 소요 시간이 자동으로 계산됩니다.</p>
           </div>
         </div>
-        <div class="form-section"><h3><span>02</span> 산행 사진</h3><p class="section-help">정상 사진, 풍경, 등산로 등 여러 장을 한꺼번에 선택할 수 있어요.</p>
+        <div class="form-section summit-section"><h3><span>02</span> 지도용 정상 인증 사진</h3><p class="section-help">지도 위 사진 아이콘에 사용할 사진을 따로 등록합니다. 정상석과 함께 찍은 사진을 추천해요.</p>
+          <label class="upload-zone summit-upload"><span class="upload-symbol">＋</span><span><strong>정상석 사진 추가</strong><small>지도 아이콘에 우선 표시할 사진입니다. 여러 장을 올리면 첫 번째 사진이 지도에 나옵니다.</small></span><input id="summit-photos-input" type="file" accept="image/*" multiple></label>
+          <div class="photo-preview-grid" id="summit-photo-previews"></div>
+        </div>
+        <div class="form-section"><h3><span>03</span> 산행 사진</h3><p class="section-help">정상 인증 사진과 별도로, 풍경·등산로·가족 사진 등을 여러 장 기록할 수 있어요.</p>
           <label class="upload-zone"><span class="upload-symbol">＋</span><span><strong>산행 사진 추가</strong><small>사진을 여러 장 선택하세요 · 배경이 투명한 PNG는 스티커처럼 표시됩니다</small></span><input id="trail-photos-input" type="file" accept="image/*" multiple></label>
           <div class="photo-preview-grid" id="trail-photo-previews"></div>
         </div>
-        <div class="form-section"><h3><span>03</span> 산행 후기</h3>
+        <div class="form-section"><h3><span>04</span> 산행 후기</h3>
           <label class="field"><span>기억하고 싶은 내용</span><textarea id="field-memo" rows="4" maxlength="4000" placeholder="코스에서 좋았던 점, 아이들과의 추억, 다음에 참고할 점 등을 적어보세요."></textarea></label>
         </div>
-        <div class="form-section food-section"><h3><span>04</span> 하산 후 식당과 메뉴</h3><p class="section-help">산행 후 들른 식당과 먹은 메뉴도 사진과 함께 기록해요.</p>
+        <div class="form-section food-section"><h3><span>05</span> 하산 후 식당과 메뉴</h3><p class="section-help">산행 후 들른 식당과 먹은 메뉴도 사진과 함께 기록해요.</p>
           <div class="form-grid">
             <label class="field span-2"><span>식당 이름</span><input id="field-restaurant" maxlength="120" placeholder="예: 하하반점"></label>
             <label class="field span-2"><span>먹은 메뉴</span><input id="field-menu" maxlength="180" placeholder="예: 짜장면, 탕수육"></label>

@@ -2,7 +2,7 @@
 
 const $ = (id) => document.getElementById(id);
 const REGION_OPTIONS = ['서울','인천','경기','강원','충북','충남','대전','경북','대구','경남','부산','울산','전북','전남','광주','제주','기타'];
-const PHOTO_KIND = { trail: '산행', food: '식당·음식' };
+const PHOTO_KIND = { summit: '정상 인증', trail: '산행', food: '식당·음식' };
 let records = [];
 let activeRegion = 'all';
 let activeNav = 'all';
@@ -98,6 +98,28 @@ function formatDate(date, style = 'long') {
 function dateForInput() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function calculateDuration(start, end) {
+  if (!start || !end) return '';
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  if ([sh, sm, eh, em].some(v => !Number.isFinite(v))) return '';
+  let minutes = (eh * 60 + em) - (sh * 60 + sm);
+  if (minutes < 0) minutes += 24 * 60; // 자정을 넘어 하산한 경우
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours && mins) return `${hours}시간 ${mins}분`;
+  if (hours) return `${hours}시간`;
+  return `${mins}분`;
+}
+function updateDurationPreview() {
+  const start = $('field-start').value;
+  const end = $('field-end').value;
+  if (start && end) {
+    $('field-duration').value = calculateDuration(start, end);
+  } else {
+    $('field-duration').value = '출발·하산 시간을 모두 입력해 주세요';
+  }
 }
 function showToast(message, isError = false) {
   const toast = $('toast');
@@ -253,8 +275,11 @@ function bindEvents() {
   $('search-input').addEventListener('input', renderCards);
   $('sort-select').addEventListener('change', e => { sortMode = e.target.value; renderCards(); });
   $('record-form').addEventListener('submit', saveForm);
-  $('trail-photos-input').addEventListener('change', e => addPhotoFiles(e.target.files, 'trail', 'trail-photo-previews'));
-  $('food-photos-input').addEventListener('change', e => addPhotoFiles(e.target.files, 'food', 'food-photo-previews'));
+  $('field-start').addEventListener('input', updateDurationPreview);
+  $('field-end').addEventListener('input', updateDurationPreview);
+  $('summit-photos-input').addEventListener('change', e => addPhotoFiles(e.target.files, 'summit'));
+  $('trail-photos-input').addEventListener('change', e => addPhotoFiles(e.target.files, 'trail'));
+  $('food-photos-input').addEventListener('change', e => addPhotoFiles(e.target.files, 'food'));
   $('backup-btn').addEventListener('click', () => openBackup());
   $('footer-backup-btn').addEventListener('click', () => openBackup());
   $('export-btn').addEventListener('click', exportBackup);
@@ -316,7 +341,7 @@ function renderHikingMap() {
   const plotted = records.map(record => ({record, point:coordsForRecord(record)})).filter(x => x.point);
   $('map-count').textContent = `${plotted.length}개 산`;
   plotted.forEach(({record, point}) => {
-    const photo = heroPhoto(record);
+    const photo = mapPhoto(record);
     const src = photo ? (photo.previewUrl || photo.dataUrl || '') : '';
     const html = `<button class="map-photo-pin ${src ? '' : 'no-photo'}" type="button" aria-label="${esc(record.name)} 산행 기록 보기">${src ? `<img src="${esc(src)}" alt="">` : '<span class="pin-mountain">▲</span>'}<b>${esc(record.name)}</b></button>`;
     const icon = L.divIcon({className:'map-photo-marker', html, iconSize:[76,88], iconAnchor:[38,78]});
@@ -372,6 +397,10 @@ function heroPhoto(record) {
   const photos = record.photos || [];
   return photos.find(p => p.category === 'trail' && (p.previewUrl || p.dataUrl)) || photos.find(p => p.previewUrl || p.dataUrl) || null;
 }
+function mapPhoto(record) {
+  const photos = record.photos || [];
+  return photos.find(p => p.category === 'summit' && (p.previewUrl || p.dataUrl)) || heroPhoto(record);
+}
 function mountainPlaceholder() {
   return `<div class="photo-placeholder"><svg viewBox="0 0 100 78" aria-hidden="true"><path d="M4 70 35 19l21 33 13-20 27 38H4Z" fill="currentColor"/><path d="m27 32 8-13 21 33-13-7-6 5-10-18Z" fill="#fff" opacity=".9"/><path d="M8 73h84" stroke="#78a98a" stroke-width="2" stroke-linecap="round"/></svg></div>`;
 }
@@ -422,19 +451,21 @@ function openForm(record = null) {
   $('field-region').value = record?.region || '';
   $('field-course').value = record?.course || '';
   $('field-distance').value = record?.distance ?? '';
-  $('field-duration').value = record?.duration || '';
+  $('field-duration').value = record?.duration || ''; 
   $('field-elevation').value = record?.elevation ?? '';
   $('field-difficulty').value = record?.difficulty || '';
   $('field-weather').value = record?.weather || '';
   $('field-companions').value = record?.companions || '';
   $('field-start').value = record?.startTime || '';
   $('field-end').value = record?.endTime || '';
+  if (record?.startTime && record?.endTime) updateDurationPreview();
   $('field-memo').value = record?.memo || '';
   $('field-restaurant').value = record?.restaurant || '';
   $('field-menu').value = record?.menu || '';
   $('field-rating').value = record?.rating ? String(record.rating) : '';
   $('field-revisit').value = record?.revisit || '';
   $('field-food-review').value = record?.foodReview || '';
+  $('summit-photos-input').value = '';
   $('trail-photos-input').value = '';
   $('food-photos-input').value = '';
   renderPhotoPreviews();
@@ -445,7 +476,7 @@ function openForm(record = null) {
 async function addPhotoFiles(fileList, category) {
   const files = Array.from(fileList || []).filter(f => f.type.startsWith('image/'));
   if (!files.length) return;
-  const input = category === 'trail' ? $('trail-photos-input') : $('food-photos-input');
+  const input = category === 'summit' ? $('summit-photos-input') : category === 'trail' ? $('trail-photos-input') : $('food-photos-input');
   const prevText = $('save-record-btn').textContent;
   $('save-record-btn').disabled = true;
   $('save-record-btn').textContent = '사진 처리 중…';
@@ -510,6 +541,7 @@ function compressImage(file) {
 }
 function renderPhotoPreviews() {
   const groups = [
+    { key:'summit', id:'summit-photo-previews' },
     { key:'trail', id:'trail-photo-previews' },
     { key:'food', id:'food-photo-previews' }
   ];
@@ -535,7 +567,7 @@ async function saveForm(event) {
   const record = {
     id, name, date:$('field-date').value || '', region:$('field-region').value,
     course:$('field-course').value.trim(), distance:$('field-distance').value ? Number($('field-distance').value) : '',
-    duration:$('field-duration').value.trim(), elevation:$('field-elevation').value ? Number($('field-elevation').value) : '',
+    duration:calculateDuration($('field-start').value, $('field-end').value) || (!$('field-start').value && !$('field-end').value ? (editingOriginal?.duration || '') : ''), elevation:$('field-elevation').value ? Number($('field-elevation').value) : '',
     difficulty:$('field-difficulty').value, weather:$('field-weather').value.trim(), companions:$('field-companions').value.trim(),
     startTime:$('field-start').value, endTime:$('field-end').value, memo:$('field-memo').value.trim(),
     restaurant:$('field-restaurant').value.trim(), menu:$('field-menu').value.trim(), rating:$('field-rating').value ? Number($('field-rating').value) : '',
@@ -599,6 +631,7 @@ function openDetail(id) {
   if (!r) return;
   const photo = heroPhoto(r);
   const photos = (r.photos || []).filter(p => p.previewUrl || p.dataUrl);
+  const summitPhotos = photos.filter(p => p.category === 'summit');
   const trailPhotos = photos.filter(p => p.category === 'trail');
   const foodPhotos = photos.filter(p => p.category === 'food');
   const fact = (label, value) => `<div class="detail-fact"><span>${label}</span><strong>${value || '—'}</strong></div>`;
@@ -609,6 +642,7 @@ function openDetail(id) {
     <div class="detail-facts">${fact('산행 거리', r.distance ? `${esc(r.distance)}km` : '')}${fact('소요 시간', esc(r.duration))}${fact('출발 / 하산', r.startTime || r.endTime ? `${esc(r.startTime || '—')} / ${esc(r.endTime || '—')}` : '')}${fact('날씨', esc(r.weather))}</div>
     ${r.companions ? `<div class="detail-section"><h3>함께한 사람</h3><p>${esc(r.companions)}</p></div>` : ''}
     <div class="detail-section"><h3>산행 후기</h3><p>${esc(r.memo || '아직 산행 후기가 없습니다.')}</p></div>
+    ${summitPhotos.length ? `<div class="detail-section"><h3>정상 인증 사진 (${summitPhotos.length}장)</h3>${photoGrid(summitPhotos)}</div>` : ''}
     <div class="detail-section"><h3>산행 사진${trailPhotos.length ? ` (${trailPhotos.length}장)` : ''}</h3>${photoGrid(trailPhotos)}</div>
     ${r.restaurant || r.menu || r.foodReview || foodPhotos.length ? `<div class="detail-section"><h3>하산 후 식당과 메뉴</h3><div class="restaurant-panel"><h4>${esc(r.restaurant || '식당 미기록')}</h4>${r.menu ? `<div class="menu-line">${esc(r.menu)}</div>` : ''}${r.rating ? `<div class="rating-stars" aria-label="만족도 ${r.rating}점">${'★'.repeat(Number(r.rating))}${'☆'.repeat(5-Number(r.rating))}</div>` : ''}${r.revisit ? `<p style="margin:8px 0 0">재방문: ${esc(r.revisit)}</p>` : ''}${r.foodReview ? `<p style="margin-top:10px">${esc(r.foodReview)}</p>` : ''}</div><div style="margin-top:14px">${photoGrid(foodPhotos)}</div></div>` : ''}
     ${isOwner ? '<div class="detail-actions"><button class="secondary-button" id="detail-delete-btn" type="button">기록 삭제</button><button class="add-button" id="detail-edit-btn" type="button">기록 수정</button></div>' : '<p class="family-readonly-note">가족 열람 전용 기록입니다.</p>'}</div></div>`;
