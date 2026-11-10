@@ -760,7 +760,8 @@ async function saveCloudRecord(record, oldRecord) {
 function openDetail(id) {
   const r = records.find(item => item.id === id);
   if (!r) return;
-  const photo = heroPhoto(r);
+  // 상세 화면의 대표 사진은 정상 인증 사진을 우선 표시하고, 없으면 산행 사진으로 대체합니다.
+  const photo = mapPhoto(r);
   const photos = (r.photos || []).filter(p => p.previewUrl || p.dataUrl);
   const summitPhotos = photos.filter(p => p.category === 'summit');
   const trailPhotos = photos.filter(p => p.category === 'trail');
