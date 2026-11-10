@@ -3,6 +3,116 @@
 const $ = (id) => document.getElementById(id);
 const REGION_OPTIONS = ['서울','인천','경기','강원','충북','충남','대전','경북','대구','경남','부산','울산','전북','전남','광주','제주','기타'];
 const PHOTO_KIND = { summit: '정상 인증', trail: '산행', food: '식당·음식' };
+
+// 공식 명산 목록(산 이름 기준). 명산100+는 포함하지 않습니다.
+// 산림청 100대 명산: 산림청 공식 안내서의 목차 기준.
+// BAC 명산100: BAC 공식 프로그램 안내와 2026-09-17 공개 목록을 대조한 정적 목록.
+const FOREST_100_NAMES = ["가리산","가리왕산","가야산","가지산","감악산","강천산","계룡산","계방산","공작산","관악산","구병산","금산","금수산","금오산","금정산","깃대봉","남산","내연산","내장산","대둔산","대암산","대야산","덕숭산(수덕산)","덕유산","덕항산","도락산","도봉산","두륜산","두타산","마니산","마이산","명성산","명지산","모악산","무등산","무학산","미륵산","민주지산","방장산","방태산","백덕산","백암산","백운산(포천)","백운산(광양)","백운산(정선)","변산","북한산","비슬산","삼악산","서대산","선운산","설악산","성인봉","소백산","소요산","속리산","신불산","연화산","오대산","오봉산","용문산","용화산","운문산","운악산","운장산","월악산","월출산","유명산","응봉산","장안산","재약산","적상산","점봉산","조계산","주왕산","주흘산","지리산","지리산(동영)","천관산","천마산","천성산","천태산","청량산","추월산","축령산","치악산","칠갑산","태백산","태화산","팔공산","팔봉산","팔영산","한라산","화악산","화왕산","황매산","황석산","황악산","황장산","희양산"];
+const BAC_100_NAMES = ["가리산(홍천)","가리왕산","가야산(경상)","가야산(충남)","가지산","감악산(원주)","감악산(파주)","계룡산","계방산","관악산","광덕산","구병산(보은)","구봉산(진안)","금수산","금오산(구미)","금정산","남산(경주)","내변산(변산)","내연산","내장산","달마산","대둔산","대야산","덕룡산","덕유산","덕항산","도락산","도봉산","동악산(곡성)","두륜산","두타산","마니산(강화도)","마이산(진안)","명지산","모악산","무등산","민주지산","지리산 바래봉","지리산 반야봉","방장산","방태산","백덕산","백암산","백운산(광양)","백운산(동강)","북한산","불갑산(영광)","비슬산","삼악산","선운산","설악산","소백산","소요산","속리산","수락산","신불산","연인산","오대산 비로봉","오대산 노인봉","오봉산(춘천)","오서산(보령)","용문산(양평)","용봉산(홍성)","용화산","운악산","운장산","월악산","월출산","유명산","응봉산","장안산","재약산","조계산","조령산","주왕산","주흘산","지리산","천관산","천마산","천성산","천태산","청계산","청량산","청화산","축령산(장성)","치악산","칠갑산(청양)","칠보산(괴산)","태백산","태화산","팔공산","팔봉산(홍천)","팔영산","한라산","함백산","화악산(가평)","화왕산(창녕)","황매산(산청)","황석산(함양)","황악산(김천)"];
+
+// 괄호 안의 지역명이나 인증 봉우리 표기는 빼고 기본 산 이름을 별칭으로도 인식합니다.
+// 실제 방문지는 산 단위로 중복 제거하므로, 같은 산을 여러 번 가도 방문 수는 1곳입니다.
+const MOUNTAIN_EXTRA_ALIASES = {
+  '금산':['남해금산'], '남산':['경주남산'], '백운산':['포천백운산','광양백운산','정선백운산','동강백운산'],
+  '축령산':['남양주축령산','가평축령산','장성축령산'], '가야산':['경상가야산','충남가야산'],
+  '감악산':['원주감악산','파주감악산'], '구병산':['보은구병산'], '금오산':['구미금오산'],
+  '오봉산':['춘천오봉산'], '오서산':['보령오서산'], '용문산':['양평용문산'], '용봉산':['홍성용봉산'],
+  '칠갑산':['청양칠갑산'], '칠보산':['괴산칠보산'], '팔봉산':['홍천팔봉산'], '화악산':['가평화악산'],
+  '화왕산':['창녕화왕산'], '황매산':['산청황매산'], '황석산':['함양황석산'], '황악산':['김천황악산'],
+  '오대산':['오대산비로봉','오대산노인봉'], '지리산':['지리산바래봉','지리산반야봉'], '변산':['내변산']
+};
+function normalizeMountainName(value) {
+  return String(value || '').toLowerCase().replace(/[\s·ㆍ,，]/g, '').replace(/[()（）\[\]【】]/g, '');
+}
+function mountainNameVariants(value) {
+  const raw = String(value || '').trim();
+  const variants = new Set();
+  if (!raw) return variants;
+  variants.add(normalizeMountainName(raw));
+  variants.add(normalizeMountainName(raw.replace(/\([^)]*\)|（[^）]*）/g, '')));
+  variants.add(normalizeMountainName(raw.replace(/\s*(정상|산행|등산)$/g, '')));
+  variants.add(normalizeMountainName(raw.replace(/\([^)]*\)|（[^）]*）/g, '').replace(/\s*(정상|산행|등산)$/g, '')));
+  return variants;
+}
+function mountainEntryParts(displayName) {
+  const withoutParen = String(displayName).replace(/\([^)]*\)|（[^）]*）/g, '').trim();
+  const base = withoutParen.replace(/\s+(비로봉|노인봉|바래봉|반야봉)$/g, '').trim();
+  const aliases = new Set([normalizeMountainName(displayName), normalizeMountainName(withoutParen), normalizeMountainName(base)]);
+  const parens = [...String(displayName).matchAll(/\(([^)]+)\)|（([^）]+)）/g)];
+  parens.forEach(m => {
+    const inside = m[1] || m[2] || '';
+    if (['수덕산','변산'].includes(inside)) aliases.add(normalizeMountainName(inside));
+  });
+  if (String(displayName).includes('지리산 ') || String(displayName).startsWith('오대산 ')) aliases.add(normalizeMountainName(base));
+  const group = normalizeMountainName(base === '내변산' ? '변산' : base);
+  (MOUNTAIN_EXTRA_ALIASES[group] || []).forEach(alias => aliases.add(normalizeMountainName(alias)));
+  return { displayName, group, aliases };
+}
+const FOREST_100_ENTRIES = FOREST_100_NAMES.map(mountainEntryParts);
+const BAC_100_ENTRIES = BAC_100_NAMES.map(mountainEntryParts);
+function isKnownRegionMismatch(record, program) {
+  const name = normalizeMountainName(record?.name);
+  const region = String(record?.region || '').trim();
+  // 같은 산 이름을 쓰지만 실제 대상 산이 다른 경우는 지역/괄호 표기로 구분합니다.
+  if (name.includes('축령산')) {
+    const jangseong = name.includes('장성') || region === '전남';
+    const gyeonggi = name.includes('남양주') || name.includes('가평') || region === '경기';
+    if (program === 'forest' && jangseong) return true;
+    if (program === 'bac' && gyeonggi) return true;
+  }
+  if (name.includes('백운산') && program === 'bac') {
+    if (name.includes('포천') || region === '경기') return true;
+    if (name.includes('정선') && !name.includes('동강')) return true;
+  }
+  if (name.includes('백운산') && program === 'forest' && name.includes('동강')) return true;
+  if (name.includes('가야산') && program === 'forest' && (name.includes('충남') || region === '충남')) return true;
+  if (name.includes('감악산') && program === 'forest' && (name.includes('원주') || region === '강원')) return true;
+  if (name.includes('남산') && !name.includes('경주') && region && region !== '경북') {
+    if (program === 'forest' || program === 'bac') return true;
+  }
+  if (name.includes('금산') && program === 'forest' && region && region !== '경남' && !name.includes('남해')) return true;
+  return false;
+}
+function matchMountainList(record, entries, program) {
+  if (isKnownRegionMismatch(record, program)) return new Set();
+  const variants = mountainNameVariants(record?.name);
+  const extra = MOUNTAIN_EXTRA_ALIASES[normalizeMountainName(String(record?.name || '').replace(/\([^)]*\)|（[^）]*）/g, '').trim())] || [];
+  extra.forEach(alias => variants.add(normalizeMountainName(alias)));
+  const matches = entries.filter(entry => [...entry.aliases].some(alias => variants.has(alias)));
+  return new Set(matches.map(entry => entry.group));
+}
+function getMountainListStatus(record) {
+  const forestGroups = matchMountainList(record, FOREST_100_ENTRIES, 'forest');
+  const bacGroups = matchMountainList(record, BAC_100_ENTRIES, 'bac');
+  return { forest: forestGroups.size > 0, bac: bacGroups.size > 0, forestGroups, bacGroups };
+}
+function mountainBadgeHtml(record, extraClass = '') {
+  const status = getMountainListStatus(record);
+  const badges = [];
+  if (status.forest) badges.push('<span class="mountain-badge forest-badge">산림청 100대</span>');
+  if (status.bac) badges.push('<span class="mountain-badge bac-badge">블랙야크 명산100</span>');
+  return badges.length ? `<div class="mountain-badges ${extraClass}">${badges.join('')}</div>` : '';
+}
+function renderMountainProgress() {
+  const forestVisited = new Set();
+  const bacVisited = new Set();
+  const sharedVisited = new Set();
+  records.forEach(record => {
+    const status = getMountainListStatus(record);
+    status.forestGroups.forEach(group => forestVisited.add(group));
+    status.bacGroups.forEach(group => bacVisited.add(group));
+    if (status.forest && status.bac) {
+      const common = [...status.forestGroups].filter(group => status.bacGroups.has(group));
+      common.forEach(group => sharedVisited.add(group));
+    }
+  });
+  $('forest-visited-count').textContent = `${forestVisited.size}곳`;
+  $('bac-visited-count').textContent = `${bacVisited.size}곳`;
+  $('shared-visited-count').textContent = `${sharedVisited.size}곳`;
+  $('mountain-progress-note').textContent = records.length
+    ? '저장된 산행 기록의 산 이름을 기준으로 자동 집계합니다. 같은 산의 반복 산행은 1곳으로 계산합니다. 이름이 같은 다른 산은 지역도 입력해 주세요. 블랙야크 공식 인증 완료 여부와는 별개입니다.'
+    : '산행 기록을 추가하면 해당 명산 목록에 포함되는 산의 방문 수가 자동으로 표시됩니다.';
+}
 let records = [];
 let activeRegion = 'all';
 let activeNav = 'all';
@@ -267,11 +377,7 @@ function bindEvents() {
   $('empty-add-btn').addEventListener('click', () => openForm());
   $('nav-all').addEventListener('click', () => setNav('all'));
   $('nav-restaurant').addEventListener('click', () => setNav('restaurant'));
-  $('nav-stats').addEventListener('click', () => {
-    const km = records.reduce((s,r) => s + (Number(r.distance) || 0), 0);
-    const unique = new Set(records.map(r => r.name.trim().toLowerCase()).filter(Boolean)).size;
-    showToast(`총 ${records.length}회 산행 · 산 ${unique}곳 · 누적 ${km.toFixed(1)}km · 맛집 기록 ${records.filter(r => r.restaurant).length}건`);
-  });
+  $('nav-stats').addEventListener('click', () => setNav('stats'));
   $('search-input').addEventListener('input', renderCards);
   $('sort-select').addEventListener('change', e => { sortMode = e.target.value; renderCards(); });
   $('record-form').addEventListener('submit', saveForm);
@@ -301,11 +407,16 @@ function setNav(nav) {
   activeNav = nav;
   $('nav-all').classList.toggle('active', nav === 'all');
   $('nav-restaurant').classList.toggle('active', nav === 'restaurant');
-  $('nav-stats').classList.remove('active');
-  $('page-title').textContent = nav === 'restaurant' ? '산행 맛집 기록' : '전체 산행 기록';
-  $('page-subtitle').textContent = nav === 'restaurant' ? '산행 후 들른 식당과 먹었던 메뉴를 모아보세요.' : '직접 걸은 길과 그날의 풍경, 하산 후 맛있게 먹은 한 끼까지.';
+  $('nav-stats').classList.toggle('active', nav === 'stats');
+  $('page-title').textContent = nav === 'restaurant' ? '산행 맛집 기록' : nav === 'stats' ? '나의 명산 기록' : '전체 산행 기록';
+  $('page-subtitle').textContent = nav === 'restaurant'
+    ? '산행 후 들른 식당과 먹었던 메뉴를 모아보세요.'
+    : nav === 'stats' ? '산림청 100대 명산과 블랙야크 명산100 방문 현황을 확인해 보세요.'
+    : '직접 걸은 길과 그날의 풍경, 하산 후 맛있게 먹은 한 끼까지.';
+  $('mountain-progress-section').hidden = nav === 'restaurant';
   renderCards();
   renderHikingMap();
+  if (nav === 'stats') setTimeout(() => $('mountain-progress-section').scrollIntoView({behavior:'smooth',block:'start'}), 50);
 }
 
 const MOUNTAIN_COORDS = {
@@ -365,6 +476,8 @@ function render() {
   $('mountain-count').textContent = unique.size;
   $('restaurant-count').textContent = records.filter(r => r.restaurant && r.restaurant.trim()).length;
   $('all-filter-count').textContent = records.length;
+  renderMountainProgress();
+  $('mountain-progress-section').hidden = activeNav === 'restaurant';
   renderRegionChips();
   renderCards();
   renderHikingMap();
@@ -436,7 +549,7 @@ function renderCards() {
     return `<article class="record-card" data-open-record="${esc(record.id)}" tabindex="0" role="button" aria-label="${esc(record.name)} 산행 기록 보기">
       <div class="card-photo">${photo ? `<img src="${esc(photo.previewUrl || photo.dataUrl || '')}" alt="${esc(record.name)} 산행 사진" loading="lazy">` : mountainPlaceholder()}<span class="date-ribbon">✓ ${esc(date)}</span>${numPhotos > 1 ? `<span class="card-photo-count">▧ ${numPhotos}장</span>` : ''}</div>
       <div class="card-content"><div class="card-meta-top"><span class="card-number">${String(index).padStart(2,'0')}</span><span class="region-tag">${esc(record.region || '지역 미지정')}</span></div>
-      <h2>${esc(record.name || '이름 없는 산행')}</h2><p class="card-elevation">${record.elevation ? `${esc(record.elevation)}m` : (stats || '산행 정보 추가 가능')}</p><p class="card-description">${esc(intro)}</p>
+      <h2>${esc(record.name || '이름 없는 산행')}</h2>${mountainBadgeHtml(record)}<p class="card-elevation">${record.elevation ? `${esc(record.elevation)}m` : (stats || '산행 정보 추가 가능')}</p><p class="card-description">${esc(intro)}</p>
       ${record.restaurant ? `<div class="card-footer"><span class="mini-icon">✦</span><span class="restaurant-teaser">${esc(record.restaurant)}${record.menu ? ` · ${esc(record.menu)}` : ''}</span></div>` : (stats ? `<div class="card-footer"><span>↗</span><span>${stats}</span></div>` : '')}</div>
     </article>`;
   }).join('');
@@ -656,7 +769,7 @@ function openDetail(id) {
   const photoGrid = arr => arr.length ? `<div class="detail-gallery">${arr.map(p => `<img src="${esc(p.previewUrl || p.dataUrl || '')}" alt="${esc(p.caption || '산행 사진')}">`).join('')}</div>` : '<p>등록된 사진이 없습니다.</p>';
   $('detail-content').innerHTML = `${photo ? `<div class="detail-cover"><img src="${esc(photo.previewUrl || photo.dataUrl || '')}" alt="${esc(r.name)} 대표 사진"></div>` : ''}
     <div class="detail-main"><div class="detail-topline"><span class="region-tag">${esc(r.region || '지역 미지정')}</span><span class="detail-date">${esc(formatDate(r.date))}</span>${r.difficulty ? `<span class="region-tag">${esc(r.difficulty)}</span>` : ''}</div>
-    <h2 id="detail-title">${esc(r.name)}</h2><div class="detail-subline">${r.elevation ? `${esc(r.elevation)}m` : '정상 높이 미기록'}${r.course ? `　·　${esc(r.course)}` : ''}</div>
+    <h2 id="detail-title">${esc(r.name)}</h2>${mountainBadgeHtml(r, 'detail-mountain-badges')}<div class="detail-subline">${r.elevation ? `${esc(r.elevation)}m` : '정상 높이 미기록'}${r.course ? `　·　${esc(r.course)}` : ''}</div>
     <div class="detail-facts">${fact('산행 거리', r.distance ? `${esc(r.distance)}km` : '')}${fact('소요 시간', esc(r.duration))}${fact('출발 / 하산', r.startTime || r.endTime ? `${esc(r.startTime || '—')} / ${esc(r.endTime || '—')}` : '')}${fact('날씨', esc(r.weather))}</div>
     ${r.companions ? `<div class="detail-section"><h3>함께한 사람</h3><p>${esc(r.companions)}</p></div>` : ''}
     <div class="detail-section"><h3>산행 후기</h3><p>${esc(r.memo || '아직 산행 후기가 없습니다.')}</p></div>

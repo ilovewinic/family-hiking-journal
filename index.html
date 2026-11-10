@@ -8,11 +8,11 @@
   <title>나의 산행기록장</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=20261110-3">
+  <link rel="stylesheet" href="styles.css?v=20261110-4">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script defer src="app.js?v=20261110-3"></script>
+  <script defer src="app.js?v=20261110-4"></script>
 </head>
 <body>
   <header class="site-header">
@@ -54,6 +54,16 @@
       <div class="map-heading"><div><p class="eyebrow">OUR FAMILY HIKING MAP</p><h2>우리 가족 산행지도</h2><p>산행한 산의 사진 아이콘을 누르면 그날의 기록을 볼 수 있어요.</p></div><span class="map-count" id="map-count">0개 산</span></div>
       <div id="hiking-map" class="hiking-map" role="application" aria-label="산행 기록 지도"></div>
       <div class="map-legend"><span><i class="legend-dot"></i> 정상 인증 사진 우선 표시</span><span>※ 정상 사진이 없으면 기존 산행 사진을 대신 표시합니다.</span></div>
+    </section>
+
+    <section class="mountain-progress-section" id="mountain-progress-section" aria-label="명산 방문 현황">
+      <div class="mountain-progress-heading"><div><p class="eyebrow">100 MOUNTAIN JOURNEY</p><h2>명산 방문 현황</h2><p>내 산행 기록에 포함된 명산을 자동으로 집계합니다.</p></div><span class="mountain-progress-mark">▲</span></div>
+      <div class="mountain-progress-grid">
+        <article class="mountain-progress-card forest-progress"><span class="progress-label">산림청 100대 명산</span><strong id="forest-visited-count">0곳</strong><small>산행 기록이 있는 산</small></article>
+        <article class="mountain-progress-card bac-progress"><span class="progress-label">블랙야크 명산100</span><strong id="bac-visited-count">0곳</strong><small>산행 기록이 있는 산</small></article>
+        <article class="mountain-progress-card shared-progress"><span class="progress-label">두 목록 공통 명산</span><strong id="shared-visited-count">0곳</strong><small>두 목록에 모두 포함된 산</small></article>
+      </div>
+      <p class="mountain-progress-note" id="mountain-progress-note">산행 기록을 추가하면 방문 수가 자동으로 표시됩니다.</p>
     </section>
 
     <div class="notice-bar" id="storage-notice">
