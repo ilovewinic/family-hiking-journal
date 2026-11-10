@@ -380,6 +380,21 @@ function renderRegionChips() {
   $('filter-row').querySelector('[data-region="all"]').classList.toggle('selected', activeRegion === 'all');
   $('filter-row').querySelector('[data-region="all"]').onclick = () => { activeRegion = 'all'; renderRegionChips(); renderCards(); };
 }
+// 산행 기록은 입력한 시각(updated_at)이 아니라 실제 산행 날짜와 출발 시각으로 정렬합니다.
+function compareHikeRecords(a, b, direction = 'desc') {
+  const dateA = String(a.date || '');
+  const dateB = String(b.date || '');
+  const dateCompare = dateA.localeCompare(dateB);
+  if (dateCompare !== 0) return direction === 'asc' ? dateCompare : -dateCompare;
+
+  const timeA = String(a.startTime || '');
+  const timeB = String(b.startTime || '');
+  // 출발 시간이 없는 옛 기록은 같은 날짜 안에서 뒤쪽에 배치합니다.
+  if (!timeA && timeB) return 1;
+  if (timeA && !timeB) return -1;
+  const timeCompare = timeA.localeCompare(timeB);
+  return direction === 'asc' ? timeCompare : -timeCompare;
+}
 function getFilteredRecords() {
   const query = $('search-input').value.trim().toLowerCase();
   let list = [...records];
@@ -387,9 +402,12 @@ function getFilteredRecords() {
   if (activeNav === 'restaurant') list = list.filter(r => r.restaurant && r.restaurant.trim());
   if (query) list = list.filter(r => [r.name,r.region,r.course,r.restaurant,r.menu,r.memo,r.foodReview,r.companions].some(v => String(v || '').toLowerCase().includes(query)));
   list.sort((a,b) => {
-    if (sortMode === 'date-asc') return String(a.date || '').localeCompare(String(b.date || ''));
-    if (sortMode === 'name-asc') return String(a.name || '').localeCompare(String(b.name || ''), 'ko');
-    return String(b.date || '').localeCompare(String(a.date || ''));
+    if (sortMode === 'date-asc') return compareHikeRecords(a, b, 'asc');
+    if (sortMode === 'name-asc') {
+      const nameCompare = String(a.name || '').localeCompare(String(b.name || ''), 'ko');
+      return nameCompare || compareHikeRecords(a, b, 'desc');
+    }
+    return compareHikeRecords(a, b, 'desc');
   });
   return list;
 }
@@ -408,8 +426,8 @@ function renderCards() {
   const list = getFilteredRecords();
   $('results-label').textContent = `${list.length}개 기록`;
   $('filter-label').textContent = activeRegion === 'all' ? (activeNav === 'restaurant' ? '식당 기록이 있는 산행' : '모든 산행을 표시합니다') : `${activeRegion} 지역`;
-  $('record-grid').innerHTML = list.map(record => {
-    const index = records.findIndex(r => r.id === record.id) + 1;
+  $('record-grid').innerHTML = list.map((record, listIndex) => {
+    const index = listIndex + 1;
     const photo = heroPhoto(record);
     const numPhotos = (record.photos || []).length;
     const date = record.date ? formatDate(record.date, 'short') : '날짜 미기록';
@@ -586,7 +604,7 @@ async function saveForm(event) {
     }
     records = records.filter(r => r.id !== id);
     records.push(saved);
-    records.sort((a,b) => String(b.date||'').localeCompare(String(a.date||'')));
+    records.sort((a,b) => compareHikeRecords(a, b, 'desc'));
     render(); closeModal('form-backdrop');
     showToast(editingOriginal ? '산행 기록을 수정했습니다.' : '새 산행 기록을 저장했습니다.');
   } catch (err) {

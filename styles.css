@@ -23,3 +23,9 @@
 
 /* Summit photo and auto duration fields */
 .duration-help{grid-column:span 2;margin:-5px 0 0;color:#78857b;font-size:10px;line-height:1.55}.field input[readonly]{background:#f4f7f4;color:#42634c;font-weight:750}.summit-section{background:#f7faf7}.summit-upload{background:#f0f7f1;border-color:#cfe2d2}.summit-upload .upload-symbol{background:#dcefe0;color:#267347}
+
+
+/* 상세 화면에서는 사진을 자르지 않고 원본 비율 그대로 보여줍니다. */
+.detail-cover{height:auto;min-height:0;max-height:72vh;display:flex;align-items:center;justify-content:center;background:#f1f4f1;overflow:hidden}
+.detail-cover img{display:block;width:auto;height:auto;max-width:100%;max-height:72vh;object-fit:contain}
+.detail-gallery img{object-fit:contain;background:#f1f4f1}
