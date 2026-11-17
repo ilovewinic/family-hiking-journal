@@ -116,3 +116,42 @@
 .album-year-heading span{padding:4px 8px;border-radius:999px;background:#e7f1e7;color:#66806a;font-size:9px;font-weight:750}
 @media(max-width:760px){.album-date-navigation{gap:8px}.album-filter-label{flex-basis:26px;padding-top:8px}.album-year-tabs,.album-month-tabs{gap:5px}.album-year-tabs button,.album-month-tabs button{min-height:30px;padding:6px 9px;font-size:9px}.album-year-heading h3{font-size:16px}.album-year-group+.album-year-group{margin-top:20px;padding-top:16px}}
 
+
+
+/* Companion tracking, individual hiking statistics and companion album filter */
+.participant-field{display:grid;gap:9px}
+.participant-options{display:flex;flex-wrap:wrap;gap:7px}
+.participant-option{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;border:1px solid #dce6dc;border-radius:999px;background:#fff;color:#506657;font-size:11px;font-weight:750;cursor:pointer}
+.participant-option:has(input:checked){background:#e9f4eb;border-color:#9bc6a4;color:#1d7045}
+.participant-option input{accent-color:#1d7045;margin:0}
+.participant-field>input{width:100%;min-height:39px;border:1px solid #dfe6df;border-radius:9px;padding:9px 11px;background:#fff;color:#35483a;font-size:12px}
+.participant-help{font-size:10px;color:#8a948c;line-height:1.5}
+.album-person-navigation{align-items:center;margin-top:12px;margin-bottom:8px}
+.album-person-navigation .album-filter-label{padding-top:0}
+.album-person-select{min-height:34px;min-width:190px;border:1px solid #dce6dc;border-radius:999px;padding:6px 30px 6px 12px;background:#fff;color:#53695a;font-size:10px;font-weight:700}
+.participant-stats-note{margin:-4px 0 14px;color:#869187;font-size:10px;line-height:1.6}
+.participant-stats{display:grid;gap:10px}
+.participant-stat-card{padding:13px;border:1px solid #e4ebe4;border-radius:12px;background:#fbfcfa}
+.participant-stat-card h4{margin:0 0 10px;color:#2a5036;font-size:14px}
+.participant-stat-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.participant-stat-metrics>div{display:grid;gap:3px;min-width:0;padding:8px;border-radius:8px;background:#f0f5f0}
+.participant-stat-metrics span{font-size:9px;color:#758278}
+.participant-stat-metrics strong{font-size:12px;color:#35553d;overflow-wrap:anywhere}
+.participant-stat-metrics small{font-size:8px;color:#8d988f}
+.participant-year-list{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:9px;padding-top:8px;border-top:1px solid #e9eee9;color:#778379;font-size:9px}
+.participant-year-list>b{color:#506653}
+.participant-year-list span b{color:#44654b}
+.combination-stats{display:grid;gap:0}
+.combination-stat-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 2px;border-bottom:1px solid #edf1ed}
+.combination-stat-row:last-child{border-bottom:0}
+.combination-stat-row>div{display:grid;gap:4px;min-width:0}
+.combination-stat-row strong{font-size:11px;color:#36543d;overflow-wrap:anywhere}
+.combination-stat-row small{font-size:9px;color:#879187}
+.combination-stat-row>b{flex:0 0 auto;color:#1e7145;font-size:12px}
+.participant-memo{margin-top:5px;color:#7d897e}
+@media(max-width:760px){
+  .album-person-select{min-width:0;max-width:100%;flex:1}
+  .participant-stats-panels{grid-template-columns:1fr}
+  .participant-stat-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .participant-option{padding:7px 10px;font-size:10px}
+}
