@@ -134,6 +134,7 @@ let albumSeason = 'all';
 let albumYear = 'all';
 let albumMonth = 'all';
 let albumPerson = 'all';
+let statsPerson = 'all';
 let signedUrlRefreshTimer = null;
 
 const DB_NAME = 'my-hiking-journal-v1';
@@ -462,6 +463,12 @@ function bindEvents() {
   $('nav-restaurant').addEventListener('click', () => setNav('restaurant'));
   $('nav-stats').addEventListener('click', () => setNav('stats'));
   $('nav-album').addEventListener('click', () => setNav('album'));
+  $('stats-person-tabs').addEventListener('click', e => {
+    const button = e.target.closest('[data-stats-person]');
+    if (!button) return;
+    statsPerson = button.dataset.statsPerson;
+    renderAdvancedStats();
+  });
   document.querySelectorAll('[data-album-mode]').forEach(btn => btn.addEventListener('click', () => { albumMode = btn.dataset.albumMode; renderAlbum(); }));
   document.querySelectorAll('[data-album-season]').forEach(btn => btn.addEventListener('click', () => { albumSeason = btn.dataset.albumSeason; renderAlbum(); }));
   $('album-person-filter').addEventListener('change', e => { albumPerson = e.target.value; renderAlbum(); });
@@ -770,62 +777,116 @@ function durationMinutes(record) {
 }
 function renderAdvancedStats() {
   if (!$('expanded-stats-grid')) return;
-  const km=records.reduce((sum,r)=>sum+(Number(r.distance)||0),0);
-  const mins=records.reduce((sum,r)=>sum+durationMinutes(r),0);
-  const timed=records.filter(r=>durationMinutes(r)>0).length;
-  const avg=records.length ? km/records.filter(r=>Number(r.distance)>0).length : 0;
-  const average=records.some(r=>Number(r.distance)>0) ? (km/records.filter(r=>Number(r.distance)>0).length).toFixed(1) : '0';
+
+  const people = getAvailableParticipantChoices();
+  if (statsPerson !== 'all' && !people.includes(statsPerson)) statsPerson = 'all';
+  $('stats-person-tabs').innerHTML = [
+    `<button type="button" class="${statsPerson === 'all' ? 'selected' : ''}" data-stats-person="all" aria-pressed="${statsPerson === 'all'}">전체 가족</button>`,
+    ...people.map(name => `<button type="button" class="${statsPerson === name ? 'selected' : ''}" data-stats-person="${esc(name)}" aria-pressed="${statsPerson === name}">${esc(name)}</button>`)
+  ].join('');
+
+  // 전체 가족은 참여자 미기록 옛 기록까지 모두 포함합니다.
+  // 개인 선택은 참여자로 명시된 산행만 집계합니다.
+  const statsRecords = statsPerson === 'all'
+    ? records
+    : records.filter(record => getParticipantNames(record).includes(statsPerson));
+  const scopeLabel = statsPerson === 'all' ? '가족 전체' : statsPerson;
+  const missingCount = records.filter(record => getParticipantNames(record).length === 0).length;
+  $('stats-person-summary').textContent = statsPerson === 'all'
+    ? `가족 전체 ${statsRecords.length}건 · 참여자 미기록 ${missingCount}건 포함`
+    : `${scopeLabel}이 참여자로 선택된 ${statsRecords.length}건의 산행 기록입니다.`;
+
+  const km = statsRecords.reduce((sum, record) => sum + (Number(record.distance) || 0), 0);
+  const mins = statsRecords.reduce((sum, record) => sum + durationMinutes(record), 0);
+  const timed = statsRecords.filter(record => durationMinutes(record) > 0).length;
+  const distanceRecords = statsRecords.filter(record => Number(record.distance) > 0);
+  const average = distanceRecords.length ? (km / distanceRecords.length).toFixed(1) : '0';
   const fmtDuration = total => `${Math.floor(total/60)}시간 ${total%60}분`;
+  const mountainNames = new Set(statsRecords.map(record => String(record.name || '').trim().toLocaleLowerCase('ko-KR')).filter(Boolean));
+  const hikingDays = new Set(statsRecords.map(record => record.date).filter(Boolean)).size;
+
   $('expanded-stats-grid').innerHTML = [
-    ['누적 산행 거리',`${km.toFixed(1)}km`,'거리 입력 기록 기준'],
-    ['누적 산행 시간',fmtDuration(mins),`${timed}건의 시간 정보 기준`],
-    ['평균 산행 거리',`${average}km`,'거리 입력 기록 기준'],
-    ['산행한 날짜',new Set(records.map(r=>r.date).filter(Boolean)).size+'일','날짜 기준 중복 제거']
-  ].map(([label,value,note])=>`<article class="expanded-stat-card"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join('');
-  const years={}; const months=Array(12).fill(0); const mountainCounts={};
-  records.forEach(r=>{ if(r.date){const y=r.date.slice(0,4); years[y]=(years[y]||0)+1; const m=Number(r.date.slice(5,7)); if(m>=1&&m<=12)months[m-1]++;} const n=String(r.name||'').trim(); if(n)mountainCounts[n]=(mountainCounts[n]||0)+1; });
-  const yearEntries=Object.entries(years).sort((a,b)=>b[0].localeCompare(a[0])); const yearMax=Math.max(1,...yearEntries.map(x=>x[1]));
-  $('year-stats').innerHTML=yearEntries.length?yearEntries.map(([year,count])=>`<div class="year-stat-row"><b>${esc(year)}년</b><span class="stat-bar"><i style="width:${count/yearMax*100}%"></i></span><strong>${count}회</strong></div>`).join(''):'<p class="empty-help">날짜가 입력된 산행 기록이 아직 없습니다.</p>';
-  const monthMax=Math.max(1,...months);
-  $('month-stats').innerHTML=months.map((count,i)=>`<div class="month-stat"><span>${i+1}월</span><i><b style="height:${count/monthMax*100}%"></b></i><strong>${count}</strong></div>`).join('');
-  const longest=records.filter(r=>Number(r.distance)>0).sort((a,b)=>Number(b.distance)-Number(a.distance))[0];
-  const longestTime=records.filter(r=>durationMinutes(r)>0).sort((a,b)=>durationMinutes(b)-durationMinutes(a))[0];
-  $('highlight-stats').innerHTML=[longest?`<p><span>가장 긴 거리</span><strong>${esc(longest.name)} · ${Number(longest.distance).toFixed(1)}km</strong></p>`:'',longestTime?`<p><span>가장 긴 산행 시간</span><strong>${esc(longestTime.name)} · ${esc(longestTime.duration || fmtDuration(durationMinutes(longestTime)))}</strong></p>`:''].filter(Boolean).join('')||'<p class="empty-help">거리와 시간이 입력된 기록이 쌓이면 표시됩니다.</p>';
-  const favorites=Object.entries(mountainCounts).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'ko')).slice(0,5);
-  $('favorite-mountains').innerHTML=favorites.length?favorites.map(([name,count],i)=>`<p><span>${i+1}. ${esc(name)}</span><strong>${count}회</strong></p>`).join(''):'<p class="empty-help">산행 기록을 추가하면 자주 찾은 산을 보여드립니다.</p>';
+    ['산행 횟수', `${statsRecords.length}회`, '선택한 범위의 산행 기록'],
+    ['누적 산행 거리', `${km.toFixed(1)}km`, '거리 입력 기록 기준'],
+    ['누적 산행 시간', fmtDuration(mins), `${timed}건의 시간 정보 기준`],
+    ['방문한 산', `${mountainNames.size}곳`, '같은 산은 1곳으로 계산'],
+    ['평균 산행 거리', `${average}km`, '거리 입력 기록 기준'],
+    ['산행한 날짜', `${hikingDays}일`, '날짜 기준 중복 제거']
+  ].map(([label,value,note]) => `<article class="expanded-stat-card"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join('');
+
+  const years = {};
+  const months = Array(12).fill(0);
+  const mountainCounts = {};
+  statsRecords.forEach(record => {
+    if (record.date) {
+      const year = record.date.slice(0,4);
+      years[year] = (years[year] || 0) + 1;
+      const month = Number(record.date.slice(5,7));
+      if (month >= 1 && month <= 12) months[month-1]++;
+    }
+    const name = String(record.name || '').trim();
+    if (name) mountainCounts[name] = (mountainCounts[name] || 0) + 1;
+  });
+
+  const yearEntries = Object.entries(years).sort((a,b) => b[0].localeCompare(a[0]));
+  const yearMax = Math.max(1, ...yearEntries.map(item => item[1]));
+  $('year-stats').innerHTML = yearEntries.length
+    ? yearEntries.map(([year,count]) => `<div class="year-stat-row"><b>${esc(year)}년</b><span class="stat-bar"><i style="width:${count/yearMax*100}%"></i></span><strong>${count}회</strong></div>`).join('')
+    : '<p class="empty-help">날짜가 입력된 산행 기록이 아직 없습니다.</p>';
+
+  const monthMax = Math.max(1, ...months);
+  $('month-stats').innerHTML = months.map((count,index) =>
+    `<div class="month-stat"><span>${index+1}월</span><i><b style="height:${count/monthMax*100}%"></b></i><strong>${count}</strong></div>`
+  ).join('');
+
+  const longest = distanceRecords.slice().sort((a,b) => Number(b.distance)-Number(a.distance))[0];
+  const longestTime = statsRecords.filter(record => durationMinutes(record)>0).sort((a,b) => durationMinutes(b)-durationMinutes(a))[0];
+  $('highlight-stats').innerHTML = [
+    longest ? `<p><span>가장 긴 거리</span><strong>${esc(longest.name)} · ${Number(longest.distance).toFixed(1)}km</strong></p>` : '',
+    longestTime ? `<p><span>가장 긴 산행 시간</span><strong>${esc(longestTime.name)} · ${esc(longestTime.duration || fmtDuration(durationMinutes(longestTime)))}</strong></p>` : ''
+  ].filter(Boolean).join('') || '<p class="empty-help">거리와 시간이 입력된 기록이 쌓이면 표시됩니다.</p>';
+
+  const favorites = Object.entries(mountainCounts).sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0],'ko')).slice(0,5);
+  $('favorite-mountains').innerHTML = favorites.length
+    ? favorites.map(([name,count],index) => `<p><span>${index+1}. ${esc(name)}</span><strong>${count}회</strong></p>`).join('')
+    : '<p class="empty-help">산행 기록을 추가하면 자주 찾은 산을 보여드립니다.</p>';
+
   renderParticipantStats();
 }
 function renderParticipantStats() {
   const fmtDuration = total => `${Math.floor(total/60)}시간 ${total%60}분`;
   const participantNames = [...new Set(records.flatMap(getParticipantNames))].sort(participantNameOrder);
   const missingCount = records.filter(record => getParticipantNames(record).length === 0).length;
-  $('participant-stats-note').textContent = `참여자별 거리와 시간은 해당 산행 전체 값을 각각 반영합니다. 가족 전체 통계는 산행 1건으로만 계산하며, 참여자 미기록 ${missingCount}건은 누구에게도 임의 배분하지 않습니다.`;
-  $('participant-stats').innerHTML = participantNames.length ? participantNames.map(name => {
-    const mine = records.filter(record => getParticipantNames(record).includes(name));
-    const km = mine.reduce((sum, record) => sum + (Number(record.distance) || 0), 0);
-    const timed = mine.filter(record => durationMinutes(record) > 0);
-    const minutes = timed.reduce((sum, record) => sum + durationMinutes(record), 0);
-    const mountains = new Set(mine.map(record => String(record.name || '').trim().toLocaleLowerCase('ko-KR')).filter(Boolean));
-    const longest = mine.filter(record => Number(record.distance) > 0).sort((a,b) => Number(b.distance)-Number(a.distance))[0];
-    const years = {};
-    mine.forEach(record => { if (/^\d{4}-\d{2}-\d{2}$/.test(String(record.date || ''))) { const year=record.date.slice(0,4); years[year]=(years[year]||0)+1; } });
-    const yearText = Object.entries(years).sort((a,b)=>b[0].localeCompare(a[0])).map(([year,count])=>`<span><b>${esc(year)}년</b> ${count}회</span>`).join('');
-    return `<article class="participant-stat-card"><h4>${esc(name)}</h4><div class="participant-stat-metrics"><div><span>산행 횟수</span><strong>${mine.length}회</strong></div><div><span>누적 거리</span><strong>${km.toFixed(1)}km</strong></div><div><span>누적 시간</span><strong>${fmtDuration(minutes)}</strong><small>시간 기록 ${timed.length}건</small></div><div><span>다른 산</span><strong>${mountains.size}곳</strong></div><div><span>최장 산행</span><strong>${longest ? `${esc(longest.name)} · ${Number(longest.distance).toFixed(1)}km` : '—'}</strong></div></div><div class="participant-year-list"><b>연도별</b> ${yearText || '<span>날짜 기록 없음</span>'}</div></article>`;
-  }).join('') : '<p class="empty-help">참여자를 선택해 산행을 저장하면 사람별 기록이 여기에 쌓입니다.</p>';
+  $('participant-stats-note').textContent = `비교표는 참여자를 지정한 ${records.length-missingCount}건 기준입니다. 참여자별 거리와 시간은 해당 산행 전체 값을 각각 반영하며, 미기록 ${missingCount}건은 누구에게도 임의 배분하지 않습니다.`;
+
+  $('participant-stats').innerHTML = participantNames.length ? `
+    <div class="participant-stats-table-wrap">
+      <table class="participant-comparison-table">
+        <thead><tr><th>사람</th><th>횟수</th><th>누적 거리</th><th>누적 시간</th><th>다른 산</th><th>최장 거리</th></tr></thead>
+        <tbody>${participantNames.map(name => {
+          const mine = records.filter(record => getParticipantNames(record).includes(name));
+          const km = mine.reduce((sum,record) => sum + (Number(record.distance)||0),0);
+          const minutes = mine.reduce((sum,record) => sum + durationMinutes(record),0);
+          const mountains = new Set(mine.map(record => String(record.name||'').trim().toLocaleLowerCase('ko-KR')).filter(Boolean));
+          const longest = mine.filter(record => Number(record.distance)>0).sort((a,b)=>Number(b.distance)-Number(a.distance))[0];
+          return `<tr><th scope="row">${esc(name)}</th><td>${mine.length}회</td><td>${km.toFixed(1)}km</td><td>${fmtDuration(minutes)}</td><td>${mountains.size}곳</td><td>${longest ? `${esc(longest.name)} · ${Number(longest.distance).toFixed(1)}km` : '—'}</td></tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`
+    : '<p class="empty-help">참여자를 지정한 산행 기록이 아직 없습니다.</p>';
 
   const combinations = new Map();
   records.forEach(record => {
     const names = getParticipantNames(record).sort(participantNameOrder);
     if (!names.length) return;
     const key = names.join(' + ');
-    const current = combinations.get(key) || { count:0, km:0, minutes:0, timed:0 };
+    const current = combinations.get(key) || {count:0,km:0,minutes:0};
     current.count++;
     current.km += Number(record.distance) || 0;
-    const duration = durationMinutes(record);
-    if (duration) { current.minutes += duration; current.timed++; }
-    combinations.set(key, current);
+    current.minutes += durationMinutes(record);
+    combinations.set(key,current);
   });
-  const comboRows = [...combinations.entries()].sort((a,b)=>b[1].count-a[1].count || a[0].localeCompare(b[0],'ko'));
+  const comboRows = [...combinations.entries()].sort((a,b) => b[1].count-a[1].count || a[0].localeCompare(b[0],'ko'));
   $('combination-stats').innerHTML = comboRows.length ? comboRows.map(([names,stats]) =>
     `<div class="combination-stat-row"><div><strong>${esc(names)}</strong><small>${stats.km.toFixed(1)}km · ${fmtDuration(stats.minutes)}</small></div><b>${stats.count}회</b></div>`
   ).join('') : '<p class="empty-help">참여자를 지정한 산행 기록이 쌓이면 함께한 조합도 집계됩니다.</p>';
