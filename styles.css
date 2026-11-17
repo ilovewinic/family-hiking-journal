@@ -43,3 +43,59 @@
 
 /* Photo viewer zoom controls and gestures */
 .photo-lightbox{overflow:hidden;touch-action:pan-x pan-y}.lightbox-figure{overflow:hidden}.lightbox-figure img{transform-origin:center center;touch-action:none;user-select:none;-webkit-user-drag:none;will-change:transform}.lightbox-tools{position:absolute;bottom:48px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:6px 9px;border:1px solid #ffffff30;border-radius:24px;background:#101813d9;z-index:2}.lightbox-tools button{min-width:34px;height:32px;padding:0 9px;border:0;border-radius:16px;background:#ffffff1c;color:#fff;font-size:17px;cursor:pointer}.lightbox-tools button:last-child{font-size:11px}.lightbox-tools span{min-width:48px;text-align:center;font-size:11px;font-variant-numeric:tabular-nums;color:#fff}.lightbox-counter{bottom:12px}@media(max-width:600px){.lightbox-tools{bottom:43px;gap:5px}.lightbox-tools button{min-width:32px;height:30px}.lightbox-counter{bottom:12px}}
+
+/* Expanded hiking statistics */
+.expanded-stats-section{margin:0 0 30px;padding:22px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 5px 22px rgba(31,50,37,.045)}
+.expanded-stats-heading h2,.album-heading h2{margin:0;font-size:22px;letter-spacing:-.045em;color:#203b2a}.expanded-stats-heading p:not(.eyebrow),.album-heading p:not(.eyebrow){margin:6px 0 0;color:#78847a;font-size:11px;line-height:1.6}
+.expanded-stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:18px}.expanded-stat-card{min-width:0;padding:15px;border:1px solid #e7ece7;border-radius:13px;background:#f8faf7;display:grid;gap:6px}.expanded-stat-card span{font-size:11px;color:#718074;font-weight:700}.expanded-stat-card strong{font-size:24px;letter-spacing:-.04em;color:#23432e}.expanded-stat-card small{font-size:9px;color:#929b93}
+.stats-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:13px}.stats-panel{min-width:0;padding:16px;border:1px solid #e8ede8;border-radius:14px;background:#fff}.stats-panel h3{margin:0 0 14px;font-size:14px;color:#314a38}.year-stats,.highlight-stats,.favorite-mountains{display:grid;gap:10px}.year-stat-row{display:grid;grid-template-columns:54px 1fr 34px;gap:9px;align-items:center;font-size:11px}.year-stat-row>b{color:#657367}.year-stat-row>strong{text-align:right;color:#35533c}.stat-bar{height:8px;background:#eff3ef;border-radius:20px;overflow:hidden}.stat-bar i{display:block;height:100%;border-radius:20px;background:#70a77c}.month-stats{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:5px;align-items:end;height:128px}.month-stat{height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px;min-width:0}.month-stat span{font-size:8px;color:#839084}.month-stat>i{height:78px;width:100%;display:flex;align-items:flex-end;background:#f1f4f1;border-radius:5px 5px 2px 2px;overflow:hidden}.month-stat>i>b{display:block;width:100%;min-height:2px;background:#78a982;border-radius:5px 5px 0 0}.month-stat strong{font-size:9px;color:#526657}.highlight-stats p,.favorite-mountains p{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:0;font-size:11px}.highlight-stats span,.favorite-mountains span{color:#718074}.highlight-stats strong,.favorite-mountains strong{color:#31513a;text-align:right}.empty-help{font-size:11px;color:#8a948c;line-height:1.6;margin:0}
+
+/* Seasonal and family photo album */
+.album-section{margin:0 0 30px;padding:22px;border:1px solid #e0e9df;border-radius:18px;background:linear-gradient(145deg,#f7faf6,#f1f6ef)}.album-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}.album-filters{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;margin:18px 0 12px}.album-mode-tabs,.album-season-tabs{display:flex;flex-wrap:wrap;gap:6px}.album-mode-tabs button,.album-season-tabs button{border:1px solid #dce6dc;border-radius:999px;padding:8px 13px;background:#fff;color:#657468;font-size:11px;font-weight:700;cursor:pointer}.album-mode-tabs button.selected,.album-season-tabs button.selected{background:#1d7045;border-color:#1d7045;color:#fff}.album-summary{margin:0 0 12px;color:#879187;font-size:10px}.album-gallery{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.album-photo-card{position:relative;display:block;overflow:hidden;min-width:0;aspect-ratio:1/1.06;padding:0;border:0;border-radius:13px;background:#dfe8df;cursor:pointer;box-shadow:0 3px 12px #203b2a12}.album-photo-card img{width:100%;height:100%;display:block;object-fit:cover;transition:transform .25s}.album-photo-card:hover img{transform:scale(1.04)}.album-photo-shade{position:absolute;left:0;right:0;bottom:0;display:grid;gap:4px;padding:25px 10px 10px;text-align:left;background:linear-gradient(transparent,#102117d9);color:#fff}.album-photo-shade b{font-size:12px}.album-photo-shade small{font-size:9px;opacity:.9;line-height:1.4}.album-empty{grid-column:1/-1;display:grid;gap:7px;padding:45px 15px;text-align:center;color:#718074}.album-empty strong{font-size:14px}.album-empty span{font-size:11px}
+
+/* Editable photo captions and record cover selection */
+.photo-preview-editable{height:auto;min-height:176px;padding-bottom:9px;display:flex;flex-direction:column;align-items:stretch;gap:6px}.photo-preview-editable img{height:112px;width:100%;object-fit:cover;border-radius:8px}.photo-caption-input{width:100%;min-width:0;border:1px solid #dfe6df;border-radius:7px;padding:6px 7px;font-size:10px;background:#fff;color:#34483a}.photo-preview-actions{display:flex;gap:5px;justify-content:space-between}.photo-preview-actions button{position:static;min-width:0;width:auto;height:auto;padding:5px 7px;border:1px solid #dfe6df;border-radius:7px;background:#fff;color:#617064;font-size:9px}.photo-preview-actions .photo-cover-button.selected{background:#e4f2e7;border-color:#b9d9c0;color:#226d3d;font-weight:800}
+.map-missing-note{margin:8px 3px 0;color:#8a938b;font-size:10px;line-height:1.5}.pin-visit-count{position:absolute;top:-8px;right:-8px;display:grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border:2px solid #fff;border-radius:20px;background:#e38a39;color:#fff;font-size:9px;font-weight:800;font-style:normal;z-index:2}.map-visit-popup{min-width:190px;display:grid;gap:7px}.map-visit-popup>strong{font-size:12px;color:#23432e}.map-visit-popup button{display:grid;gap:3px;padding:7px 8px;text-align:left;border:1px solid #e4ebe4;border-radius:8px;background:#f8faf7;cursor:pointer}.map-visit-popup button span{font-size:9px;color:#7c897e}.map-visit-popup button b{font-size:10px;color:#395642;font-weight:650}
+.auth-reset-link{margin-top:12px;font-size:11px}.password-recovery-panel{display:grid;gap:10px;margin:16px 0 6px;padding:15px;border:1px solid #dfe9df;border-radius:12px;background:#f7faf7}.password-recovery-panel h3{margin:0 0 2px;font-size:14px;color:#304a37}.password-recovery-panel .field{margin:0}
+@media(max-width:760px){.expanded-stats-section,.album-section{padding:15px;border-radius:15px}.expanded-stats-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.expanded-stat-card{padding:11px}.expanded-stat-card strong{font-size:20px}.stats-panels{grid-template-columns:1fr;gap:8px}.album-gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.album-filters{display:grid}.album-heading h2,.expanded-stats-heading h2{font-size:19px}.album-photo-shade b{font-size:11px}}
+@media(max-width:440px){.top-nav{flex-wrap:wrap;gap:2px}.top-nav .nav-link{padding:7px 8px;font-size:10px}.month-stats{gap:3px}.month-stat span{font-size:7px}.month-stat strong{font-size:8px}}
+
+/* Added in 2026-11: responsive navigation, photo controls and account tools */
+.account-name-pill{display:inline-flex;align-items:center;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:7px 10px;border:1px solid #dce8dd;border-radius:999px;background:#f4f8f4;color:#315b3f;font-size:10px;font-weight:800}
+.detail-cover{position:relative}
+.detail-photo-item{display:grid;align-content:start;gap:6px;min-width:0}
+.detail-gallery .detail-photo-item img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;border-radius:9px;background:#eff3ef}
+.detail-photo-save{justify-self:start;border:1px solid #dce7dd;border-radius:8px;background:#f7faf7;color:#42664b;padding:6px 9px;font-size:10px;font-weight:750;cursor:pointer}
+.detail-photo-save:hover{background:#eaf3eb}
+.cover-photo-save{position:absolute;right:14px;bottom:14px;z-index:2;background:#17271edb;color:#fff;border-color:#ffffff50}
+.detail-photo-caption{font-size:10px;line-height:1.5;color:#758176;overflow-wrap:anywhere}
+.detail-cover .cover-photo-save{box-shadow:0 2px 10px #0003}
+.photo-lightbox{overscroll-behavior:contain}
+@media(max-width:1120px){
+  .site-header{height:auto;min-height:65px;flex-wrap:wrap;padding:9px 18px;align-items:center}
+  .top-nav{display:flex;order:3;flex:1 1 100%;justify-content:center;gap:5px;margin:0;padding:7px 0 0;border-top:1px solid #edf1ed}
+  .header-actions{margin-left:auto;flex:1 1 auto;justify-content:flex-end;flex-wrap:wrap;gap:5px}
+  .header-actions .secondary-button{padding:7px 9px;font-size:10px}
+}
+@media(max-width:760px){
+  .site-header{padding:9px 12px;gap:8px}
+  .brand{order:1;flex:1 1 100%}
+  .header-actions{order:2;flex:1 1 100%;margin:0;justify-content:flex-end;gap:5px}
+  .top-nav{order:3;flex:1 1 100%;justify-content:space-between;gap:2px;padding-top:7px}
+  .top-nav .nav-link{flex:1 1 auto;padding:8px 5px;font-size:10px;white-space:nowrap}
+  .account-name-pill{display:none}
+  .header-actions .secondary-button{padding:7px 8px;font-size:9px}
+  .detail-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .detail-photo-save{font-size:9px;padding:6px 7px}
+}
+@media(max-width:390px){
+  .top-nav .nav-link{font-size:9px;padding:7px 3px}
+  .header-actions .secondary-button{padding:6px 7px;font-size:8px}
+  .sync-pill{font-size:8px}
+}
+.account-name-pill[hidden]{display:none!important}
+
+/* 계정 표시 이름 입력창 여백 */
+#profile-form{padding:20px 28px 0}
+#profile-form .form-actions{padding:17px 0 18px}
+@media(max-width:760px){#profile-form{padding:18px 18px 0}#profile-form .form-actions{padding:15px 0 18px}}

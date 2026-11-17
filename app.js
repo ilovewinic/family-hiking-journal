@@ -129,6 +129,9 @@ let authMode = 'login';
 let toastTimer = null;
 let hikingMap = null;
 let hikingMapLayer = null;
+let albumMode = 'all';
+let albumSeason = 'all';
+let signedUrlRefreshTimer = null;
 
 const DB_NAME = 'my-hiking-journal-v1';
 const DB_STORE = 'records';
@@ -177,13 +180,28 @@ async function localDelete(id) {
     tx.onerror = () => { db.close(); reject(tx.error); };
   });
 }
+async function localPutMany(items) {
+  const db = await openLocalDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    const store = tx.objectStore(DB_STORE);
+    items.forEach(item => store.put(item));
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error || new Error('복원 내용을 저장하지 못했습니다.')); };
+    tx.onabort = () => { db.close(); reject(tx.error || new Error('복원 작업이 취소되었습니다.')); };
+  });
+}
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function cleanPhoto(photo) {
   const out = { id: photo.id || makeId(), category: photo.category || 'trail' };
   if (photo.caption) out.caption = photo.caption;
+  if (photo.isCover) out.isCover = true;
   if (photo.dataUrl) out.dataUrl = photo.dataUrl;
   if (photo.path) out.path = photo.path;
+  if (photo.originalDataUrl) out.originalDataUrl = photo.originalDataUrl;
+  if (photo.originalPath) out.originalPath = photo.originalPath;
+  if (photo.originalName) out.originalName = photo.originalName;
   return out;
 }
 function cleanRecord(record) {
@@ -252,13 +270,28 @@ function safeText(v) { return v === undefined || v === null ? '' : String(v); }
 
 async function init() {
   bindEvents();
+  window.addEventListener('focus', refreshSignedPhotoUrls);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSignedPhotoUrls(); });
   if (isCloudConfigured() && window.supabase?.createClient) {
     try {
       cloudClient = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey, {
         auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
       });
+      // 인증 링크 복귀 이벤트를 getSession 처리 전에 등록해 비밀번호 재설정 신호를 놓치지 않습니다.
+      cloudClient.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT') {
+          cloudUser = null; cloudRole = 'pending'; isOwner = false; records = []; setAuthMode('login'); applyPermissions();
+          render(); setStorageStatus('로그인 필요', true); openModal('auth-backdrop');
+        } else if (event === 'PASSWORD_RECOVERY') {
+          $('auth-tabs').hidden = true; $('auth-form').hidden = true; $('auth-reset-link').hidden = true;
+          $('password-change-panel').hidden = true; $('password-recovery-panel').hidden = false;
+          $('auth-message').textContent = '새 비밀번호를 입력해 주세요.'; openModal('auth-backdrop');
+        }
+      });
       cloudMode = true;
       setStorageStatus('클라우드 연결', true);
+      if (signedUrlRefreshTimer) clearInterval(signedUrlRefreshTimer);
+      signedUrlRefreshTimer = setInterval(refreshSignedPhotoUrls, 40 * 60 * 1000);
       $('storage-notice-text').textContent = '클라우드 모드가 설정되어 있습니다. 같은 계정으로 로그인한 기기에서 기록을 함께 볼 수 있습니다.';
       const { data, error } = await cloudClient.auth.getSession();
       if (error) throw error;
@@ -268,23 +301,14 @@ async function init() {
         await loadCloudRecords();
         closeModal('auth-backdrop');
       } else {
+        applyPermissions();
         setStorageStatus('로그인 필요', true);
         openModal('auth-backdrop');
       }
-      cloudClient.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_OUT') {
-          cloudUser = null;
-          cloudRole = 'pending'; isOwner = false;
-          records = [];
-          render();
-          setStorageStatus('로그인 필요', true);
-          openModal('auth-backdrop');
-        }
-      });
     } catch (err) {
       console.error(err);
       if (cloudClient) {
-        cloudMode = true;
+        cloudMode = true; cloudUser = null; isOwner = false; applyPermissions();
         setStorageStatus('클라우드 확인 필요', true);
         $('storage-notice').hidden = false;
         $('storage-notice-text').textContent = `클라우드 로그인 또는 계정 권한을 확인해 주세요: ${err.message || '연결 오류'}`;
@@ -333,7 +357,10 @@ async function establishCloudRole() {
 function applyPermissions() {
   ['add-record-btn','empty-add-btn','backup-btn','footer-backup-btn'].forEach(id => { const el=$(id); if(el) el.hidden = !isOwner; });
   const familyBtn = $('family-manage-btn'); if (familyBtn) familyBtn.hidden = !isOwner;
-  const logoutBtn = $('logout-btn'); if (logoutBtn) logoutBtn.hidden = !cloudMode;
+  const logoutBtn = $('logout-btn'); if (logoutBtn) logoutBtn.hidden = !cloudMode || !cloudUser;
+  const passwordBtn = $('change-password-btn'); if (passwordBtn) passwordBtn.hidden = !cloudMode || !cloudUser;
+  const profileBtn = $('account-profile-btn'); if (profileBtn) profileBtn.hidden = !cloudMode || !cloudUser;
+  updateAccountDisplayName();
   document.body.classList.toggle('family-reader', cloudMode && !isOwner);
 }
 async function loadCloudRecords() {
@@ -361,11 +388,61 @@ async function hydrateCloudRecord(input) {
     const photo = cleanPhoto(raw);
     if (photo.path && cloudClient) {
       const { data, error } = await cloudClient.storage.from('hike-photos').createSignedUrl(photo.path, 60 * 60);
-      if (!error && data?.signedUrl) photo.previewUrl = data.signedUrl;
+      if (!error && data?.signedUrl) {
+        photo.previewUrl = data.signedUrl;
+        photo.previewExpiresAt = Date.now() + 55 * 60 * 1000;
+      }
     } else if (photo.dataUrl) photo.previewUrl = photo.dataUrl;
     record.photos.push(photo);
   }
   return record;
+}
+async function refreshSignedPhotoUrls() {
+  if (!cloudMode || !cloudClient || !cloudUser || document.hidden) return;
+  let changed = false;
+  for (const record of records) {
+    for (const photo of (record.photos || [])) {
+      if (!photo.path || (photo.previewExpiresAt && photo.previewExpiresAt > Date.now() + 5 * 60 * 1000)) continue;
+      try {
+        const { data, error } = await cloudClient.storage.from('hike-photos').createSignedUrl(photo.path, 60 * 60);
+        if (error) throw error;
+        if (data?.signedUrl) {
+          photo.previewUrl = data.signedUrl;
+          photo.previewExpiresAt = Date.now() + 55 * 60 * 1000;
+          changed = true;
+        }
+      } catch (err) { console.warn('사진 주소 갱신 실패:', err); }
+    }
+  }
+  if (changed) { renderCards(); renderHikingMap(); if (!$('detail-backdrop').hidden) { const openId = $('detail-content').dataset.recordId; if (openId) openDetail(openId); } }
+}
+
+function updateAccountDisplayName() {
+  const pill=$('account-display-name');
+  if (!pill) return;
+  const email=cloudUser?.email || '';
+  const display=String(cloudUser?.user_metadata?.display_name || '').trim() || (email ? email.split('@')[0] : '');
+  pill.textContent=display;
+  pill.hidden = !(cloudMode && Boolean(cloudUser) && Boolean(display));
+}
+function openProfile() {
+  if (!cloudUser) return;
+  $('profile-display-name').value=String(cloudUser.user_metadata?.display_name || '').trim();
+  $('profile-status').textContent='';
+  openModal('profile-backdrop');
+}
+async function saveProfile(event) {
+  event.preventDefault();
+  const name=$('profile-display-name').value.trim();
+  if (!name) { $('profile-status').textContent='표시할 이름을 입력해 주세요.'; return; }
+  const btn=$('profile-save-btn'); btn.disabled=true; btn.textContent='저장 중…';
+  try {
+    const {data,error}=await cloudClient.auth.updateUser({data:{display_name:name}});
+    if(error) throw error;
+    cloudUser=data.user || {...cloudUser,user_metadata:{...cloudUser.user_metadata,display_name:name}};
+    updateAccountDisplayName(); closeModal('profile-backdrop'); showToast('계정 표시 이름을 저장했습니다.');
+  } catch(err) { $('profile-status').textContent=`이름 저장 실패: ${err.message||''}`; }
+  finally { btn.disabled=false; btn.textContent='이름 저장'; }
 }
 
 function bindEvents() {
@@ -373,11 +450,17 @@ function bindEvents() {
   $('family-manage-btn').addEventListener('click', openFamilyManager);
   $('family-add-form').addEventListener('submit', addFamilyMember);
   $('family-backdrop').addEventListener('click', (e) => { if (e.target === $('family-backdrop')) closeModal('family-backdrop'); });
+  $('profile-backdrop').addEventListener('click', (e) => { if (e.target === $('profile-backdrop')) closeModal('profile-backdrop'); });
+  $('account-profile-btn').addEventListener('click', openProfile);
+  $('profile-form').addEventListener('submit', saveProfile);
   $('logout-btn').addEventListener('click', async () => { if (cloudClient) await cloudClient.auth.signOut(); });
   $('empty-add-btn').addEventListener('click', () => openForm());
   $('nav-all').addEventListener('click', () => setNav('all'));
   $('nav-restaurant').addEventListener('click', () => setNav('restaurant'));
   $('nav-stats').addEventListener('click', () => setNav('stats'));
+  $('nav-album').addEventListener('click', () => setNav('album'));
+  document.querySelectorAll('[data-album-mode]').forEach(btn => btn.addEventListener('click', () => { albumMode = btn.dataset.albumMode; renderAlbum(); }));
+  document.querySelectorAll('[data-album-season]').forEach(btn => btn.addEventListener('click', () => { albumSeason = btn.dataset.albumSeason; renderAlbum(); }));
   $('search-input').addEventListener('input', renderCards);
   $('sort-select').addEventListener('change', e => { sortMode = e.target.value; renderCards(); });
   $('record-form').addEventListener('submit', saveForm);
@@ -395,9 +478,13 @@ function bindEvents() {
   $('auth-login-tab').addEventListener('click', () => setAuthMode('login'));
   $('auth-signup-tab').addEventListener('click', () => setAuthMode('signup'));
   $('auth-form').addEventListener('submit', submitAuth);
+  $('auth-reset-link').addEventListener('click', sendPasswordReset);
+  $('save-new-password-btn').addEventListener('click', completePasswordRecovery);
+  $('save-changed-password-btn').addEventListener('click', changePassword);
+  $('change-password-btn').addEventListener('click', () => { $('auth-message').textContent = ''; $('auth-tabs').hidden = true; $('auth-form').hidden = true; $('auth-reset-link').hidden = true; $('password-recovery-panel').hidden = true; $('password-change-panel').hidden = false; openModal('auth-backdrop'); });
   $('form-backdrop').addEventListener('click', (e) => { if (e.target === $('form-backdrop')) closeModal('form-backdrop'); });
   $('detail-backdrop').addEventListener('click', (e) => { if (e.target === $('detail-backdrop')) closeModal('detail-backdrop'); });
-  $('detail-content').addEventListener('click', e => { const img = e.target.closest('.zoomable-photo'); if (img) openPhotoViewer(img); });
+  $('detail-content').addEventListener('click', e => { const download = e.target.closest('[data-download-photo]'); if (download) { downloadPhotoById(download.dataset.downloadPhoto).catch(err=>showToast(`사진 저장 실패: ${err.message||''}`,true)); return; } const img = e.target.closest('.zoomable-photo'); if (img) openPhotoViewer(img); });
   $('lightbox-close').addEventListener('click', closePhotoViewer);
   $('lightbox-prev').addEventListener('click', () => movePhotoViewer(-1));
   $('lightbox-next').addEventListener('click', () => movePhotoViewer(1));
@@ -417,15 +504,28 @@ function setNav(nav) {
   $('nav-all').classList.toggle('active', nav === 'all');
   $('nav-restaurant').classList.toggle('active', nav === 'restaurant');
   $('nav-stats').classList.toggle('active', nav === 'stats');
-  $('page-title').textContent = nav === 'restaurant' ? '산행 맛집 기록' : nav === 'stats' ? '나의 명산 기록' : '전체 산행 기록';
+  $('nav-album').classList.toggle('active', nav === 'album');
+  $('page-title').textContent = nav === 'restaurant' ? '산행 맛집 기록' : nav === 'stats' ? '나의 산행 통계' : nav === 'album' ? '가족 산행 앨범' : '전체 산행 기록';
   $('page-subtitle').textContent = nav === 'restaurant'
     ? '산행 후 들른 식당과 먹었던 메뉴를 모아보세요.'
-    : nav === 'stats' ? '산림청 100대 명산과 블랙야크 명산100 방문 현황을 확인해 보세요.'
+    : nav === 'stats' ? '누적 거리와 시간, 연도별·월별 산행을 돌아보세요.'
+    : nav === 'album' ? '계절마다 쌓인 풍경과 가족 산행 사진을 모아봅니다.'
     : '직접 걸은 길과 그날의 풍경, 하산 후 맛있게 먹은 한 끼까지.';
-  $('mountain-progress-section').hidden = nav === 'restaurant';
+  $('mountain-progress-section').hidden = nav === 'restaurant' || nav === 'album';
+  $('expanded-stats-section').hidden = nav !== 'stats';
+  $('album-section').hidden = nav !== 'album';
+  $('storage-notice').hidden = nav === 'album' || nav === 'stats';
+  const nonListPage = nav === 'album' || nav === 'stats';
+  $('toolbar').hidden = nonListPage;
+  $('filter-row').hidden = nonListPage;
+  $('results-line').hidden = nonListPage;
+  $('record-grid').hidden = nonListPage;
+  $('empty-state').hidden = nonListPage || getFilteredRecords().length > 0;
   renderCards();
+  renderAdvancedStats();
+  renderAlbum();
   renderHikingMap();
-  if (nav === 'stats') setTimeout(() => $('mountain-progress-section').scrollIntoView({behavior:'smooth',block:'start'}), 50);
+  if (nav === 'stats') setTimeout(() => $('expanded-stats-section').scrollIntoView({behavior:'smooth',block:'start'}), 50);
 }
 
 const MOUNTAIN_COORDS = {
@@ -434,12 +534,60 @@ const MOUNTAIN_COORDS = {
   '고려산':[37.783,126.424], '함백산':[37.161,128.917], '오대산':[37.798,128.543],
   '주왕산':[36.389,129.161], '무등산':[35.134,126.988], '감악산':[37.936,126.965],
   '북한산':[37.658,126.977], '관악산':[37.445,126.964], '도봉산':[37.695,127.015],
+  '설악산':[38.1197,128.4654], '한라산':[33.3617,126.5292], '지리산':[35.3369,127.7306],
+  '덕유산':[35.8612,127.7462], '소백산':[36.9579,128.4846], '치악산':[37.3653,128.0559],
+  '월악산':[36.8862,128.1016], '속리산':[36.5439,127.8705], '내장산':[35.485,126.889],
+  '선운산':[35.493,126.575], '대둔산':[36.12,127.319], '계룡산':[36.35,127.205],
+  '대야산':[36.685,127.95], '희양산':[36.73,128.01], '민주지산':[36.055,127.85],
+  '도락산':[36.856,128.31], '금수산':[36.987,128.26], '주흘산':[36.795,128.10],
+  '황장산':[36.85,128.22], '청량산':[36.79,128.91], '팔공산':[36.014,128.696],
+  '비슬산':[35.715,128.511], '가야산':[35.822,128.117], '금오산':[36.091,128.314],
+  '금정산':[35.282,129.049], '가지산':[35.62,129.00], '신불산':[35.54,129.05],
+  '재약산':[35.55,128.98], '천성산':[35.416,129.104], '황석산':[35.673,127.811],
+  '황악산':[36.116,128.0], '내연산':[36.256,129.284], '월출산':[34.766,126.706],
+  '두륜산':[34.471,126.626], '천관산':[34.539,126.914], '팔영산':[34.622,127.408],
+  '조계산':[34.988,127.292], '모악산':[35.729,127.088], '변산':[35.65,126.58],
+  '강천산':[35.407,127.047], '덕숭산':[36.67,126.62], '오서산':[36.45,126.66],
+  '칠갑산':[36.42,126.86], '가리산':[37.893,127.962], '공작산':[37.704,128.03],
+  '계방산':[37.728,128.465], '방태산':[37.891,128.405], '가리왕산':[37.460,128.566],
+  '두타산':[37.428,129.017], '덕항산':[37.355,129.011], '민둥산':[37.279,128.785],
+  '화악산':[38.019,127.502], '명성산':[38.106,127.318], '명지산':[37.941,127.435],
+  '운악산':[37.878,127.336], '연인산':[37.922,127.394], '유명산':[37.579,127.490],
+  '용문산':[37.565,127.561], '천마산':[37.681,127.267], '수락산':[37.691,127.081],
+  '불암산':[37.66,127.097], '검단산':[37.525,127.258], '남한산':[37.477,127.182],
+  '수리산':[37.36,126.89], '마이산':[35.761,127.397], '천태산':[36.22,127.58],
+  '팔봉산':[37.70,127.70], '방장산':[35.453,126.754], '추월산':[35.43,127.02],
+  '무학산':[35.208,128.56], '미륵산':[34.80,128.42], '황매산':[35.488,127.974],
+  '구병산':[36.48,127.82], '남해금산':[34.77,127.98], '대암산':[38.21,128.13],
+  '삼악산':[37.85,127.65], '서대산':[36.24,127.64], '성인봉':[37.50,130.86],
+  '연화산':[35.06,128.26], '오봉산':[38.006,127.855], '운문산':[35.62,128.96],
+  '운장산':[35.90,127.45], '장안산':[35.62,127.59], '적상산':[35.94,127.68],
+  '점봉산':[38.05,128.47], '응봉산':[37.08,129.23], '화왕산':[35.55,128.54],
+  '백덕산':[37.42,128.26], '백암산':[35.45,126.88], '광덕산':[38.08,127.45],
+  '용화산':[38.02,127.74], '태화산':[37.11,128.56], '대암산':[38.21,128.13],
+  '구봉산':[35.94,127.39], '달마산':[34.38,126.55], '덕룡산':[34.55,126.74],
+  '동악산':[35.28,127.31], '불갑산':[35.21,126.52], '용봉산':[36.64,126.63],
+  '조령산':[36.79,128.08], '청화산':[36.60,127.92], '칠보산':[36.71,127.90]
 };
 function coordsForRecord(record) {
-  const name = String(record.name || '').replace(/\s/g,'');
+  if (Array.isArray(record.coordinates) && record.coordinates.length === 2 && record.coordinates.every(Number.isFinite)) return record.coordinates;
+  const name = String(record.name || '').replace(/[\s·ㆍ]/g,'');
+  const region = String(record.region || '');
+  if (name.includes('백운산')) {
+    if (name.includes('포천') || region === '경기') return [37.75,127.38];
+    if (name.includes('광양') || region === '전남') return [35.11,127.62];
+    if (name.includes('정선') || region === '강원') return [37.39,128.69];
+  }
+  if (name.includes('금산') && (name.includes('남해') || region === '경남')) return [34.77,127.98];
+  if (name.includes('가야산')) return name.includes('충남') || region === '충남' ? [36.71,126.62] : [35.822,128.117];
+  if (name.includes('감악산')) return name.includes('원주') || region === '강원' ? [37.265,128.032] : [37.936,126.965];
+  if (name.includes('축령산')) return name.includes('장성') || region === '전남' ? [35.39,126.78] : [37.74,127.32];
+  if (name.includes('경주남산') || (name === '남산' && region === '경북')) return [35.78,129.22];
+  if (name.includes('축령산') && (name.includes('장성') || region === '전남')) return [35.39,126.78];
   for (const [key, point] of Object.entries(MOUNTAIN_COORDS)) if (name.includes(key)) return point;
   return null;
 }
+
 function renderHikingMap() {
   const section = $('family-map-section');
   if (!section) return;
@@ -450,27 +598,44 @@ function renderHikingMap() {
     return;
   }
   if (!hikingMap) {
+    // 휠 줌은 산행지도에서만 사용합니다. 사진 뷰어의 휠 이벤트와 분리됩니다.
     hikingMap = L.map('hiking-map', { scrollWheelZoom:false, zoomControl:true }).setView([36.35,127.75], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom:18, attribution:'&copy; OpenStreetMap'
+      maxZoom:18, attribution:'&copy; OpenStreetMap contributors'
     }).addTo(hikingMap);
     hikingMapLayer = L.layerGroup().addTo(hikingMap);
     setTimeout(() => hikingMap && hikingMap.invalidateSize(), 180);
   }
   hikingMapLayer.clearLayers();
-  const plotted = records.map(record => ({record, point:coordsForRecord(record)})).filter(x => x.point);
-  $('map-count').textContent = `${plotted.length}개 산`;
-  plotted.forEach(({record, point}) => {
+  const known = records.map(record => ({record, point:coordsForRecord(record)})).filter(x => x.point);
+  const grouped = new Map();
+  known.forEach(item => {
+    // 산 이름 표기(괄호/지역명)가 달라도 같은 좌표면 같은 산행 지점으로 묶습니다.
+    const key = `${Number(item.point[0]).toFixed(3)},${Number(item.point[1]).toFixed(3)}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(item);
+  });
+  const missing = records.filter(r => !coordsForRecord(r)).length;
+  $('map-count').textContent = `${grouped.size}개 산 · ${known.length}회 방문`;
+  $('map-missing-note').textContent = missing ? `아직 지도 좌표가 없는 산행 ${missing}건은 추후 좌표 목록 보강이 필요합니다.` : '등록된 산행 기록을 모두 지도에 표시하고 있습니다.';
+  grouped.forEach(items => {
+    items.sort((a,b) => compareHikeRecords(a.record,b.record,'desc'));
+    const {record, point} = items[0];
     const photo = mapPhoto(record);
     const src = photo ? (photo.previewUrl || photo.dataUrl || '') : '';
-    const html = `<button class="map-photo-pin ${src ? '' : 'no-photo'}" type="button" aria-label="${esc(record.name)} 산행 기록 보기">${src ? `<img src="${esc(src)}" alt="">` : '<span class="pin-mountain">▲</span>'}<b>${esc(record.name)}</b></button>`;
-    const icon = L.divIcon({className:'map-photo-marker', html, iconSize:[76,88], iconAnchor:[38,78]});
+    const html = `<div class="map-photo-pin-wrap"><button class="map-photo-pin ${src ? '' : 'no-photo'}" type="button" aria-label="${esc(record.name)} 산행 기록 보기">${src ? `<img src="${esc(src)}" alt="">` : '<span class="pin-mountain">▲</span>'}<b>${esc(record.name)}</b>${items.length > 1 ? `<i class="pin-visit-count">${items.length}회</i>` : ''}</button></div>`;
+    const icon = L.divIcon({className:'map-photo-marker', html, iconSize:[82,92], iconAnchor:[41,82]});
     const marker = L.marker(point,{icon}).addTo(hikingMapLayer);
-    marker.on('click', () => openDetail(record.id));
+    if (items.length === 1) marker.on('click', () => openDetail(record.id));
+    else {
+      const popup = `<div class="map-visit-popup"><strong>${esc(record.name)} · ${items.length}회 방문</strong>${items.map(({record:r}) => `<button type="button" data-map-record="${esc(r.id)}"><span>${esc(formatDate(r.date,'short'))}</span><b>${esc(r.course || '산행 기록 보기')}</b></button>`).join('')}</div>`;
+      marker.bindPopup(popup, {maxWidth:280});
+      marker.on('popupopen', event => event.popup.getElement()?.querySelectorAll('[data-map-record]').forEach(btn => btn.addEventListener('click', () => { const id=btn.dataset.mapRecord; hikingMap.closePopup(); openDetail(id); })));
+    }
   });
-  if (plotted.length) {
-    const bounds = L.latLngBounds(plotted.map(x => x.point));
-    if (plotted.length === 1) hikingMap.setView(plotted[0].point, 9);
+  if (known.length) {
+    const bounds = L.latLngBounds(known.map(x => x.point));
+    if (grouped.size === 1) hikingMap.setView(known[0].point, 9);
     else hikingMap.fitBounds(bounds.pad(0.28), {maxZoom:8});
   } else {
     hikingMap.setView([36.35,127.75], 7);
@@ -486,7 +651,11 @@ function render() {
   $('restaurant-count').textContent = records.filter(r => r.restaurant && r.restaurant.trim()).length;
   $('all-filter-count').textContent = records.length;
   renderMountainProgress();
-  $('mountain-progress-section').hidden = activeNav === 'restaurant';
+  $('mountain-progress-section').hidden = activeNav === 'restaurant' || activeNav === 'album';
+  $('expanded-stats-section').hidden = activeNav !== 'stats';
+  $('album-section').hidden = activeNav !== 'album';
+  renderAdvancedStats();
+  renderAlbum();
   renderRegionChips();
   renderCards();
   renderHikingMap();
@@ -541,6 +710,73 @@ function mapPhoto(record) {
   const photos = record.photos || [];
   return photos.find(p => p.category === 'summit' && (p.previewUrl || p.dataUrl)) || heroPhoto(record);
 }
+function recordCoverPhoto(record) {
+  const photos = record.photos || [];
+  return photos.find(p => p.isCover && p.category !== 'food' && (p.previewUrl || p.dataUrl)) || mapPhoto(record);
+}
+function isFamilyRecord(record) {
+  return /가족|아들|딸|자녀|아이|부부|아빠|엄마|아내|남편|부모님|형제|자매/i.test(String(record.companions || ''));
+}
+function getSeason(date) {
+  const month = Number(String(date || '').split('-')[1] || 0);
+  if ([3,4,5].includes(month)) return 'spring';
+  if ([6,7,8].includes(month)) return 'summer';
+  if ([9,10,11].includes(month)) return 'autumn';
+  if ([12,1,2].includes(month)) return 'winter';
+  return 'unknown';
+}
+function durationMinutes(record) {
+  if (record.startTime && record.endTime) {
+    const [sh,sm]=record.startTime.split(':').map(Number), [eh,em]=record.endTime.split(':').map(Number);
+    if ([sh,sm,eh,em].every(Number.isFinite)) return ((eh*60+em)-(sh*60+sm)+1440)%1440;
+  }
+  const value=String(record.duration || '');
+  const h=value.match(/(\d+)\s*시간/), m=value.match(/(\d+)\s*분/);
+  if (h || m) return Number(h?.[1] || 0)*60 + Number(m?.[1] || 0);
+  return 0;
+}
+function renderAdvancedStats() {
+  if (!$('expanded-stats-grid')) return;
+  const km=records.reduce((sum,r)=>sum+(Number(r.distance)||0),0);
+  const mins=records.reduce((sum,r)=>sum+durationMinutes(r),0);
+  const timed=records.filter(r=>durationMinutes(r)>0).length;
+  const avg=records.length ? km/records.filter(r=>Number(r.distance)>0).length : 0;
+  const average=records.some(r=>Number(r.distance)>0) ? (km/records.filter(r=>Number(r.distance)>0).length).toFixed(1) : '0';
+  const fmtDuration = total => `${Math.floor(total/60)}시간 ${total%60}분`;
+  $('expanded-stats-grid').innerHTML = [
+    ['누적 산행 거리',`${km.toFixed(1)}km`,'거리 입력 기록 기준'],
+    ['누적 산행 시간',fmtDuration(mins),`${timed}건의 시간 정보 기준`],
+    ['평균 산행 거리',`${average}km`,'거리 입력 기록 기준'],
+    ['산행한 날짜',new Set(records.map(r=>r.date).filter(Boolean)).size+'일','날짜 기준 중복 제거']
+  ].map(([label,value,note])=>`<article class="expanded-stat-card"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join('');
+  const years={}; const months=Array(12).fill(0); const mountainCounts={};
+  records.forEach(r=>{ if(r.date){const y=r.date.slice(0,4); years[y]=(years[y]||0)+1; const m=Number(r.date.slice(5,7)); if(m>=1&&m<=12)months[m-1]++;} const n=String(r.name||'').trim(); if(n)mountainCounts[n]=(mountainCounts[n]||0)+1; });
+  const yearEntries=Object.entries(years).sort((a,b)=>b[0].localeCompare(a[0])); const yearMax=Math.max(1,...yearEntries.map(x=>x[1]));
+  $('year-stats').innerHTML=yearEntries.length?yearEntries.map(([year,count])=>`<div class="year-stat-row"><b>${esc(year)}년</b><span class="stat-bar"><i style="width:${count/yearMax*100}%"></i></span><strong>${count}회</strong></div>`).join(''):'<p class="empty-help">날짜가 입력된 산행 기록이 아직 없습니다.</p>';
+  const monthMax=Math.max(1,...months);
+  $('month-stats').innerHTML=months.map((count,i)=>`<div class="month-stat"><span>${i+1}월</span><i><b style="height:${count/monthMax*100}%"></b></i><strong>${count}</strong></div>`).join('');
+  const longest=records.filter(r=>Number(r.distance)>0).sort((a,b)=>Number(b.distance)-Number(a.distance))[0];
+  const longestTime=records.filter(r=>durationMinutes(r)>0).sort((a,b)=>durationMinutes(b)-durationMinutes(a))[0];
+  $('highlight-stats').innerHTML=[longest?`<p><span>가장 긴 거리</span><strong>${esc(longest.name)} · ${Number(longest.distance).toFixed(1)}km</strong></p>`:'',longestTime?`<p><span>가장 긴 산행 시간</span><strong>${esc(longestTime.name)} · ${esc(longestTime.duration || fmtDuration(durationMinutes(longestTime)))}</strong></p>`:''].filter(Boolean).join('')||'<p class="empty-help">거리와 시간이 입력된 기록이 쌓이면 표시됩니다.</p>';
+  const favorites=Object.entries(mountainCounts).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'ko')).slice(0,5);
+  $('favorite-mountains').innerHTML=favorites.length?favorites.map(([name,count],i)=>`<p><span>${i+1}. ${esc(name)}</span><strong>${count}회</strong></p>`).join(''):'<p class="empty-help">산행 기록을 추가하면 자주 찾은 산을 보여드립니다.</p>';
+}
+function renderAlbum() {
+  if (!$('album-gallery')) return;
+  document.querySelectorAll('[data-album-mode]').forEach(btn=>btn.classList.toggle('selected',btn.dataset.albumMode===albumMode));
+  document.querySelectorAll('[data-album-season]').forEach(btn=>btn.classList.toggle('selected',btn.dataset.albumSeason===albumSeason));
+  const list=[...records].sort((a,b)=>compareHikeRecords(a,b,'desc'));
+  const items=[];
+  list.forEach(record=>{
+    if(albumMode==='family'&&!isFamilyRecord(record))return;
+    if(albumSeason!=='all'&&getSeason(record.date)!==albumSeason)return;
+    (record.photos||[]).filter(p=>['summit','trail'].includes(p.category)&&(p.previewUrl||p.dataUrl)).forEach(photo=>items.push({record,photo}));
+  });
+  $('album-count').textContent=`${items.length}장`;
+  $('album-summary').textContent=albumMode==='family'?'함께한 사람에 가족·자녀 등의 내용이 기록된 산행 사진입니다.':'식당 사진을 제외한 정상 인증·산행 사진을 표시합니다.';
+  $('album-gallery').innerHTML=items.length?items.map(({record,photo},i)=>`<button type="button" class="album-photo-card" data-album-record="${esc(record.id)}" aria-label="${esc(record.name)} 사진 보기"><img src="${esc(photo.previewUrl||photo.dataUrl||'')}" alt="${esc(photo.caption||record.name)}" loading="lazy"><span class="album-photo-shade"><b>${esc(record.name)}</b><small>${esc(formatDate(record.date,'short'))}${photo.caption?` · ${esc(photo.caption)}`:''}</small></span></button>`).join(''):'<div class="album-empty"><strong>아직 표시할 사진이 없습니다.</strong><span>계절이나 가족 산행 조건을 바꾸거나 산행 사진을 추가해 보세요.</span></div>';
+  $('album-gallery').querySelectorAll('[data-album-record]').forEach(btn=>btn.addEventListener('click',()=>openDetail(btn.dataset.albumRecord)));
+}
 function mountainPlaceholder() {
   return `<div class="photo-placeholder"><svg viewBox="0 0 100 78" aria-hidden="true"><path d="M4 70 35 19l21 33 13-20 27 38H4Z" fill="currentColor"/><path d="m27 32 8-13 21 33-13-7-6 5-10-18Z" fill="#fff" opacity=".9"/><path d="M8 73h84" stroke="#78a98a" stroke-width="2" stroke-linecap="round"/></svg></div>`;
 }
@@ -551,7 +787,7 @@ function renderCards() {
   $('record-grid').innerHTML = list.map((record, listIndex) => {
     const index = listIndex + 1;
     // 카드 대표 사진도 지도와 상세 화면처럼 정상 인증 사진을 우선 사용합니다.
-    const photo = mapPhoto(record);
+    const photo = recordCoverPhoto(record);
     const numPhotos = (record.photos || []).length;
     const date = record.date ? formatDate(record.date, 'short') : '날짜 미기록';
     const intro = record.course || record.memo || '산행 코스와 후기를 기록해 보세요.';
@@ -568,8 +804,9 @@ function renderCards() {
     card.addEventListener('click', open);
     card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
   });
-  $('empty-state').hidden = list.length > 0;
-  $('record-grid').hidden = list.length === 0;
+  const nonListPage = activeNav === 'album' || activeNav === 'stats';
+  $('empty-state').hidden = nonListPage || list.length > 0;
+  $('record-grid').hidden = nonListPage || list.length === 0;
   if (!records.length) {
     $('empty-title').textContent = '첫 산행을 기록해 보세요';
     $('empty-copy').textContent = '사진 한 장으로 시작해도 좋아요. 산행 정보와 하산 후 식당까지 한곳에 모아둘 수 있습니다.';
@@ -614,20 +851,32 @@ function openForm(record = null) {
   setTimeout(() => $('field-name').focus(), 50);
 }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('원본 사진을 읽지 못했습니다.'));
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.readAsDataURL(file);
+  });
+}
 async function addPhotoFiles(fileList, category) {
   const files = Array.from(fileList || []).filter(f => f.type.startsWith('image/'));
   if (!files.length) return;
   const input = category === 'summit' ? $('summit-photos-input') : category === 'trail' ? $('trail-photos-input') : $('food-photos-input');
   const prevText = $('save-record-btn').textContent;
+  let skippedOriginal = 0;
   $('save-record-btn').disabled = true;
   $('save-record-btn').textContent = '사진 처리 중…';
   try {
     for (const file of files) {
       const dataUrl = await compressImage(file);
-      draftPhotos.push({ id: makeId(), category, dataUrl, caption: file.name.replace(/\.[^.]+$/, '') });
+      // 12MB 이하 파일은 표시용 압축본과 별도로 원본도 보관합니다.
+      const originalDataUrl = file.size <= 8 * 1024 * 1024 ? await readFileAsDataUrl(file) : '';
+      if (!originalDataUrl) skippedOriginal++;
+      draftPhotos.push({ id: makeId(), category, dataUrl, ...(originalDataUrl ? {originalDataUrl, originalName:file.name} : {}), caption: file.name.replace(/\.[^.]+$/, '') });
     }
     renderPhotoPreviews();
-    showToast(`${files.length}장 사진을 추가했습니다.`);
+    showToast(skippedOriginal ? `${files.length}장 추가 완료 · ${skippedOriginal}장은 용량이 커 압축본만 저장합니다.` : `${files.length}장 사진을 추가했습니다. 원본도 함께 보관합니다.`);
   } catch (err) {
     console.error(err);
     showToast('사진을 읽지 못했습니다. 다른 사진 파일로 시도해 주세요.', true);
@@ -637,6 +886,7 @@ async function addPhotoFiles(fileList, category) {
     input.value = '';
   }
 }
+
 function compressImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -689,9 +939,15 @@ function renderPhotoPreviews() {
   groups.forEach(g => {
     $(g.id).innerHTML = draftPhotos.map((p, i) => ({p,i})).filter(x => x.p.category === g.key).map(({p,i}) => {
       const src = p.previewUrl || p.dataUrl || '';
-      return `<div class="photo-preview"><img src="${esc(src)}" alt="${esc(PHOTO_KIND[p.category] || '사진')}"><span class="photo-kind">${esc(PHOTO_KIND[p.category] || '사진')}</span><button type="button" data-remove-photo="${i}" aria-label="사진 제거">×</button></div>`;
+      return `<div class="photo-preview photo-preview-editable"><img src="${esc(src)}" alt="${esc(PHOTO_KIND[p.category] || '사진')}"><span class="photo-kind">${esc(PHOTO_KIND[p.category] || '사진')}</span><input class="photo-caption-input" type="text" maxlength="120" value="${esc(p.caption || '')}" data-photo-caption-index="${i}" aria-label="사진 설명"><div class="photo-preview-actions">${p.category !== 'food' ? `<button type="button" class="photo-cover-button ${p.isCover ? 'selected' : ''}" data-set-cover="${i}">${p.isCover ? '대표 사진' : '대표로 지정'}</button>` : ''}<button type="button" data-remove-photo="${i}" aria-label="사진 제거">삭제</button></div></div>`;
     }).join('');
   });
+  document.querySelectorAll('[data-photo-caption-index]').forEach(input => input.addEventListener('input', () => { const photo=draftPhotos[Number(input.dataset.photoCaptionIndex)]; if(photo) photo.caption=input.value; }));
+  document.querySelectorAll('[data-set-cover]').forEach(btn => btn.addEventListener('click', () => {
+    const selected=Number(btn.dataset.setCover);
+    draftPhotos.forEach((photo,index)=>{ if(photo.category!=='food') photo.isCover=index===selected; });
+    renderPhotoPreviews();
+  }));
   document.querySelectorAll('[data-remove-photo]').forEach(btn => btn.addEventListener('click', () => {
     draftPhotos.splice(Number(btn.dataset.removePhoto), 1);
     renderPhotoPreviews();
@@ -729,7 +985,7 @@ async function saveForm(event) {
     records.push(saved);
     records.sort((a,b) => compareHikeRecords(a, b, 'desc'));
     render(); closeModal('form-backdrop');
-    showToast(editingOriginal ? '산행 기록을 수정했습니다.' : '새 산행 기록을 저장했습니다.');
+    showToast(saved.originalUploadWarning ? '기록과 압축 사진은 저장했지만 일부 원본 사진은 용량/권한 문제로 저장하지 못했습니다.' : (editingOriginal ? '산행 기록을 수정했습니다.' : '새 산행 기록을 저장했습니다.'));
   } catch (err) {
     console.error(err);
     showToast(`저장에 실패했습니다: ${err.message || '저장소를 확인해 주세요.'}`, true);
@@ -738,25 +994,48 @@ async function saveForm(event) {
   }
 }
 
+function extensionFromMime(mime) {
+  const subtype=String(mime||'image/jpeg').toLowerCase().split('/')[1]?.split(';')[0] || 'jpeg';
+  if (subtype === 'jpeg' || subtype === 'pjpeg') return 'jpg';
+  if (subtype === 'svg+xml') return 'svg';
+  return /^[a-z0-9]+$/.test(subtype) ? subtype : 'jpg';
+}
 async function dataUrlToBlob(dataUrl) {
   const res = await fetch(dataUrl);
   return await res.blob();
 }
 async function saveCloudRecord(record, oldRecord) {
-  const oldPaths = new Set((oldRecord?.photos || []).map(p => p.path).filter(Boolean));
+  const oldPaths = new Set((oldRecord?.photos || []).flatMap(p => [p.path,p.originalPath]).filter(Boolean));
   const clean = cleanRecord(record);
+  let originalUploadWarning = false;
   for (const photo of clean.photos) {
+    const photoId = photo.id || makeId();
     if (photo.dataUrl) {
       const blob = await dataUrlToBlob(photo.dataUrl);
-      const ext = blob.type === 'image/png' ? 'png' : 'jpg';
-      const path = `${cloudUser.id}/${record.id}/${photo.id || makeId()}.${ext}`;
+      const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+      const path = `${cloudUser.id}/${record.id}/${photoId}.${ext}`;
       const { error } = await cloudClient.storage.from('hike-photos').upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: true });
       if (error) throw error;
       photo.path = path;
       delete photo.dataUrl;
     }
+    if (photo.originalDataUrl) {
+      try {
+        const originalBlob = await dataUrlToBlob(photo.originalDataUrl);
+        const mime = originalBlob.type || 'image/jpeg';
+        const originalExt = extensionFromMime(mime);
+        const originalPath = `${cloudUser.id}/${record.id}/${photoId}_original.${originalExt}`;
+        const { error } = await cloudClient.storage.from('hike-photos').upload(originalPath, originalBlob, { contentType:mime, upsert:true });
+        if (error) throw error;
+        photo.originalPath = originalPath;
+      } catch (err) {
+        originalUploadWarning = true;
+        console.warn('원본 사진 저장 생략(압축본은 저장):',err);
+      }
+      delete photo.originalDataUrl;
+    }
   }
-  const newPaths = new Set(clean.photos.map(p => p.path).filter(Boolean));
+  const newPaths = new Set(clean.photos.flatMap(p => [p.path,p.originalPath]).filter(Boolean));
   const { error } = await cloudClient.from('hike_records').upsert({ id:record.id, owner_id:cloudUser.id, record:clean, updated_at:new Date().toISOString() });
   if (error) throw error;
   const removePaths = [...oldPaths].filter(p => !newPaths.has(p));
@@ -764,7 +1043,9 @@ async function saveCloudRecord(record, oldRecord) {
     const { error: delErr } = await cloudClient.storage.from('hike-photos').remove(removePaths);
     if (delErr) console.warn('Old photo cleanup failed', delErr);
   }
-  return await hydrateCloudRecord(clean);
+  const hydrated = await hydrateCloudRecord(clean);
+  hydrated.originalUploadWarning = originalUploadWarning;
+  return hydrated;
 }
 
 let viewerPhotos = [];
@@ -808,7 +1089,16 @@ function setPhotoZoom(value) {
 function resetPhotoZoom() { photoZoom = 1; photoPanX = 0; photoPanY = 0; if ($('lightbox-image')) setPhotoZoom(1); }
 function setupPhotoZoom() {
   const image = $('lightbox-image');
-  image.addEventListener('wheel', e => { e.preventDefault(); setPhotoZoom(photoZoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15)); }, {passive:false});
+  const viewer = $('photo-lightbox');
+  // 이미지 픽셀 위뿐 아니라 전체 사진 뷰어 영역에서 휠을 받습니다.
+  // 캡션·이전/다음·확대 버튼 위에서는 일반 버튼 동작을 방해하지 않습니다.
+  viewer.addEventListener('wheel', e => {
+    if (viewer.hidden || !(e.target instanceof Element) || e.target.closest('.lightbox-tools,.lightbox-close,.lightbox-nav')) return;
+    e.preventDefault();
+    const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 600 : e.deltaY;
+    const factor = Math.exp(-delta * 0.0018);
+    setPhotoZoom(photoZoom * factor);
+  }, {passive:false, capture:true});
   image.addEventListener('dblclick', e => { e.preventDefault(); setPhotoZoom(photoZoom > 1 ? 1 : 2); });
   image.addEventListener('pointerdown', e => {
     e.preventDefault(); image.setPointerCapture(e.pointerId);
@@ -838,18 +1128,56 @@ function closePhotoViewer() {
   viewerPhotos = [];
 }
 
+async function downloadPhotoById(photoId) {
+  const recordId=$('detail-content').dataset.recordId;
+  const record=records.find(r=>r.id===recordId);
+  const photo=(record?.photos||[]).find(p=>p.id===photoId);
+  if (!record || !photo) throw new Error('사진 정보를 찾을 수 없습니다.');
+  let blob;
+  const hasOriginal = Boolean(photo.originalDataUrl || photo.originalPath);
+  if (photo.originalDataUrl) blob=await dataUrlToBlob(photo.originalDataUrl);
+  else if (cloudMode && photo.originalPath) {
+    const {data,error}=await cloudClient.storage.from('hike-photos').createSignedUrl(photo.originalPath,60*60);
+    if(error) throw error;
+    const response=await fetch(data?.signedUrl || '');
+    if(!response.ok) throw new Error('원본 사진을 내려받지 못했습니다.');
+    blob=await response.blob();
+  } else if (photo.dataUrl) blob=await dataUrlToBlob(photo.dataUrl);
+  else {
+    let url=photo.previewUrl || '';
+    if (cloudMode && photo.path) {
+      const {data,error}=await cloudClient.storage.from('hike-photos').createSignedUrl(photo.path,60*60);
+      if(error) throw error;
+      url=data?.signedUrl || url;
+    }
+    if (!url) throw new Error('사진 주소가 없습니다.');
+    const response=await fetch(url);
+    if(!response.ok) throw new Error('사진을 내려받지 못했습니다.');
+    blob=await response.blob();
+  }
+  const mime=blob.type||'image/jpeg';
+  const ext=extensionFromMime(mime);
+  const base=(photo.originalName || photo.caption || '산행사진').replace(/\.[^.]+$/,'');
+  const fileName=`${record.name}_${base}_${photo.id}${hasOriginal?'_원본':''}.${ext}`.replace(/[\\/:*?"<>|]/g,'_');
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=fileName; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  showToast(hasOriginal ? '원본 사진을 저장했습니다.' : '저장된 사진을 내려받았습니다.');
+}
+
 function openDetail(id) {
   const r = records.find(item => item.id === id);
   if (!r) return;
   // 상세 화면의 대표 사진은 정상 인증 사진을 우선 표시하고, 없으면 산행 사진으로 대체합니다.
-  const photo = mapPhoto(r);
+  const photo = recordCoverPhoto(r);
   const photos = (r.photos || []).filter(p => p.previewUrl || p.dataUrl);
   const summitPhotos = photos.filter(p => p.category === 'summit');
   const trailPhotos = photos.filter(p => p.category === 'trail');
   const foodPhotos = photos.filter(p => p.category === 'food');
   const fact = (label, value) => `<div class="detail-fact"><span>${label}</span><strong>${value || '—'}</strong></div>`;
-  const photoGrid = arr => arr.length ? `<div class="detail-gallery">${arr.map(p => `<img class="zoomable-photo" src="${esc(p.previewUrl || p.dataUrl || '')}" alt="${esc(p.caption || '산행 사진')}" data-photo-caption="${esc(p.caption || r.name + ' 산행 사진')}" loading="lazy">`).join('')}</div>` : '<p>등록된 사진이 없습니다.</p>';
-  $('detail-content').innerHTML = `${photo ? `<div class="detail-cover"><img class="zoomable-photo" src="${esc(photo.previewUrl || photo.dataUrl || '')}" alt="${esc(r.name)} 대표 사진" data-photo-caption="${esc(r.name)} 대표 사진"></div>` : ''}
+  const photoGrid = arr => arr.length ? `<div class="detail-gallery">${arr.map(p => `<div class="detail-photo-item"><img class="zoomable-photo" src="${esc(p.previewUrl || p.dataUrl || '')}" alt="${esc(p.caption || '산행 사진')}" data-photo-caption="${esc(p.caption || r.name + ' 산행 사진')}" loading="lazy"><button type="button" class="detail-photo-save" data-download-photo="${esc(p.id)}">${p.originalDataUrl || p.originalPath ? '원본 저장 ↓' : '사진 저장 ↓'}</button>${p.caption ? `<span class="detail-photo-caption">${esc(p.caption)}</span>` : ''}</div>`).join('')}</div>` : '<p>등록된 사진이 없습니다.</p>';
+  $('detail-content').dataset.recordId = id;
+  $('detail-content').innerHTML = `${photo ? `<div class="detail-cover"><img class="zoomable-photo" src="${esc(photo.previewUrl || photo.dataUrl || '')}" alt="${esc(r.name)} 대표 사진" data-photo-caption="${esc(photo.caption || r.name + ' 대표 사진')}"><button type="button" class="detail-photo-save cover-photo-save" data-download-photo="${esc(photo.id)}">${photo.originalDataUrl || photo.originalPath ? '대표 원본 저장 ↓' : '대표 사진 저장 ↓'}</button></div>` : ''}
     <div class="detail-main"><div class="detail-topline"><span class="region-tag">${esc(r.region || '지역 미지정')}</span><span class="detail-date">${esc(formatDate(r.date))}</span>${r.difficulty ? `<span class="region-tag">${esc(r.difficulty)}</span>` : ''}</div>
     <h2 id="detail-title">${esc(r.name)}</h2>${mountainBadgeHtml(r, 'detail-mountain-badges')}<div class="detail-subline">${r.elevation ? `${esc(r.elevation)}m` : '정상 높이 미기록'}${r.course ? `　·　${esc(r.course)}` : ''}</div>
     <div class="detail-facts">${fact('산행 거리', r.distance ? `${esc(r.distance)}km` : '')}${fact('소요 시간', esc(r.duration))}${fact('출발 / 하산', r.startTime || r.endTime ? `${esc(r.startTime || '—')} / ${esc(r.endTime || '—')}` : '')}${fact('날씨', esc(r.weather))}</div>
@@ -872,7 +1200,7 @@ async function deleteRecord(id) {
   if (!record || !confirm(`'${record.name}' 산행 기록을 삭제할까요? 삭제한 기록은 복구하기 어렵습니다.`)) return;
   try {
     if (cloudMode) {
-      const paths = (record.photos || []).map(p => p.path).filter(Boolean);
+      const paths = (record.photos || []).flatMap(p => [p.path,p.originalPath]).filter(Boolean);
       const { error } = await cloudClient.from('hike_records').delete().eq('id', id);
       if (error) throw error;
       if (paths.length) {
@@ -900,61 +1228,104 @@ async function exportBackup() {
   $('backup-status').textContent = '기록과 사진을 모으고 있습니다.';
   try {
     const backupRecords = [];
+    let completedPhotos = 0;
+    const totalPhotos = records.reduce((sum,r)=>sum+(r.photos||[]).length,0);
     for (const r of records) {
       const copy = cleanRecord(r);
       copy.photos = [];
       for (const p of (r.photos || [])) {
         const item = cleanPhoto(p);
-        if (!item.dataUrl && p.previewUrl) {
-          try { item.dataUrl = await toDataUrlFromUrl(p.previewUrl); delete item.path; }
-          catch (err) { /* keep path metadata if a network backup cannot fetch this picture */ }
+        if (!item.dataUrl) {
+          try {
+            let url = p.previewUrl || '';
+            // 기존에 발급한 1시간짜리 주소가 만료됐을 수 있으므로 백업할 때 새 주소를 발급합니다.
+            if (cloudMode && p.path) {
+              const {data,error}=await cloudClient.storage.from('hike-photos').createSignedUrl(p.path,60*60);
+              if(error) throw error;
+              url=data?.signedUrl || url;
+            }
+            if (url) { item.dataUrl = await toDataUrlFromUrl(url); delete item.path; }
+          } catch (err) { console.warn('사진 백업 일부 실패:', p.path || p.id, err); }
         }
         if (!item.dataUrl && item.path) item.note = '클라우드 사진 경로: ' + item.path;
+        if (!item.originalDataUrl && p.originalPath && cloudMode) {
+          try {
+            const {data,error}=await cloudClient.storage.from('hike-photos').createSignedUrl(p.originalPath,60*60);
+            if(error) throw error;
+            if(data?.signedUrl) item.originalDataUrl=await toDataUrlFromUrl(data.signedUrl);
+          } catch(err) { console.warn('원본 사진 백업 실패:',p.originalPath,err); }
+        }
         copy.photos.push(item);
+        completedPhotos++;
+        $('backup-status').textContent = `사진 백업 중… ${completedPhotos}/${totalPhotos}`;
       }
       backupRecords.push(copy);
     }
-    const payload = { app:'나의 산행기록장', version:1, exportedAt:new Date().toISOString(), photoMode: cloudMode ? 'cloud' : 'local', records:backupRecords };
+    const payload = { app:'나의 산행기록장', version:2, exportedAt:new Date().toISOString(), photoMode: cloudMode ? 'cloud' : 'local', records:backupRecords };
     const blob = new Blob([JSON.stringify(payload)], {type:'application/json;charset=utf-8'});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `산행기록장_백업_${dateForInput()}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    const noPhoto = backupRecords.reduce((s,r) => s + (r.photos || []).filter(p => !p.dataUrl).length, 0);
-    $('backup-status').textContent = noPhoto ? `백업 파일을 만들었습니다. 일부 클라우드 사진 ${noPhoto}장은 네트워크 문제로 포함하지 못했을 수 있습니다.` : '백업 파일을 내려받았습니다. 안전한 개인 저장공간에 보관하세요.';
+    const a = document.createElement('a'); a.href = url; a.download = `산행기록장_백업_${dateForInput()}.json`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    const noPhoto = backupRecords.reduce((sum,r) => sum + (r.photos || []).filter(p => !p.dataUrl).length, 0);
+    const noOriginal = backupRecords.reduce((sum,r) => sum + (r.photos || []).filter(p => p.originalPath && !p.originalDataUrl).length, 0);
+    $('backup-status').textContent = noPhoto || noOriginal
+      ? `백업 파일을 만들었습니다. 사진 ${noPhoto}장 또는 원본 ${noOriginal}장은 포함되지 못했을 수 있습니다. 원본 사진도 별도로 보관해 주세요.`
+      : `산행 기록 ${backupRecords.length}건과 저장된 사진·원본을 백업했습니다. 안전한 개인 저장공간에 보관하세요.`;
   } catch (err) {
     console.error(err); $('backup-status').textContent = `백업 실패: ${err.message || ''}`;
   } finally { btn.disabled = false; btn.textContent = '백업 내려받기'; }
 }
+function validateBackupPayload(payload) {
+  if (!payload || !Array.isArray(payload.records)) throw new Error('산행기록장 백업 파일 형식이 아닙니다.');
+  if (payload.records.length > 2000) throw new Error('산행 기록이 너무 많습니다. 파일을 확인해 주세요.');
+  return payload.records.map((raw,index)=>{
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`${index+1}번째 기록의 형식이 올바르지 않습니다.`);
+    if (!String(raw.name || '').trim()) throw new Error(`${index+1}번째 기록에 산 이름이 없습니다.`);
+    if (raw.photos !== undefined && !Array.isArray(raw.photos)) throw new Error(`${index+1}번째 기록의 사진 목록이 올바르지 않습니다.`);
+    const photos=(raw.photos||[]).map((photo,photoIndex)=>{
+      if (!photo || typeof photo !== 'object' || Array.isArray(photo)) throw new Error(`${index+1}번째 기록의 ${photoIndex+1}번째 사진 정보가 올바르지 않습니다.`);
+      if (photo.dataUrl && !/^data:image\/[a-z0-9.+-]+;base64,/i.test(photo.dataUrl)) throw new Error(`${index+1}번째 기록의 ${photoIndex+1}번째 사진 파일을 확인해 주세요.`);
+      if (photo.originalDataUrl && !/^data:image\/[a-z0-9.+-]+;base64,/i.test(photo.originalDataUrl)) throw new Error(`${index+1}번째 기록의 ${photoIndex+1}번째 원본 사진 파일을 확인해 주세요.`);
+      return {...photo,id:photo.id||makeId(),category:['summit','trail','food'].includes(photo.category)?photo.category:'trail'};
+    });
+    return {...raw,id:raw.id||makeId(),name:String(raw.name).trim(),photos};
+  });
+}
 async function importBackup(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  const status = $('backup-status'); status.textContent = '백업 파일을 읽고 있습니다.';
+  const status = $('backup-status'); status.textContent = '백업 파일을 읽고 검사하고 있습니다.';
+  const importBtn = $('import-file-input');
+  importBtn.disabled = true;
   try {
+    if (file.size > 250 * 1024 * 1024) throw new Error('백업 파일이 250MB를 초과합니다. 파일을 나누어 주세요.');
     const payload = JSON.parse(await file.text());
-    if (!payload || !Array.isArray(payload.records)) throw new Error('산행기록장 백업 파일 형식이 아닙니다.');
-    let imported = 0;
-    for (const raw of payload.records) {
-      const r = { ...raw, id: raw.id || makeId(), photos: (raw.photos || []).map(p => ({...p, id:p.id || makeId()})) };
-      delete r.previewUrl;
-      // Duplicate IDs are updated; records with a different ID are added.
-      const old = records.find(x => x.id === r.id) || null;
-      if (cloudMode) {
-        if (!cloudUser) throw new Error('먼저 클라우드 계정에 로그인해 주세요.');
-        const previousPhotos = old || null;
-        const saved = await saveCloudRecord(r, previousPhotos);
-        records = records.filter(x => x.id !== saved.id); records.push(saved);
-      } else {
-        const clean = cleanRecord(r);
-        await localPut(clean);
-        records = records.filter(x => x.id !== clean.id); records.push({...clean,photos:clean.photos.map(p=>({...p,previewUrl:p.dataUrl||''}))});
+    // 파일 전체를 먼저 검사하므로 잘못된 항목 때문에 중간에 복원이 시작되지 않습니다.
+    const prepared = validateBackupPayload(payload);
+    if (cloudMode && (!cloudUser || !isOwner)) throw new Error('클라우드 백업 복원은 관리자 계정으로 로그인해야 합니다.');
+    if (!cloudMode) {
+      const cleanItems=prepared.map(raw=>cleanRecord(raw));
+      await localPutMany(cleanItems); // IndexedDB 단일 트랜잭션으로 일괄 저장
+      const merged=new Map(records.map(r=>[r.id,r]));
+      cleanItems.forEach(item=>merged.set(item.id,{...item,photos:item.photos.map(photo=>({...photo,previewUrl:photo.dataUrl||''}))}));
+      records=[...merged.values()].sort((a,b)=>compareHikeRecords(a,b,'desc'));
+      render(); status.textContent=`백업 파일 검사를 통과했습니다. ${cleanItems.length}개 기록을 한 번에 복원했습니다.`;
+    } else {
+      let imported=0;
+      for (const r of prepared) {
+        const old=records.find(item=>item.id===r.id)||null;
+        const saved=await saveCloudRecord(r,old);
+        records=records.filter(item=>item.id!==saved.id); records.push(saved);
+        imported++;
+        status.textContent=`클라우드 복원 중… ${imported}/${prepared.length}건`;
       }
-      imported++;
+      records.sort((a,b)=>compareHikeRecords(a,b,'desc'));
+      render(); status.textContent=`파일 검사 완료 후 ${imported}개 기록을 복원했습니다. 중간에 연결이 끊기면 같은 백업 파일을 다시 선택해도 이미 복원된 ID는 업데이트됩니다.`;
     }
-    records.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
-    render(); status.textContent = `${imported}개 산행 기록을 복원했습니다. 기존과 ID가 같은 기록은 업데이트했습니다.`;
     event.target.value = '';
   } catch (err) {
-    console.error(err); status.textContent = `복원 실패: ${err.message || '파일을 확인해 주세요.'}`;
-  }
+    console.error(err); status.textContent = `복원하지 못했습니다: ${err.message || '파일을 확인해 주세요.'}`;
+  } finally { importBtn.disabled=false; }
 }
 
 async function openFamilyManager() {
@@ -999,7 +1370,52 @@ function setAuthMode(mode) {
   $('auth-title').textContent = mode === 'login' ? '산행기록장 로그인' : '산행기록장 계정 만들기';
   $('auth-submit').textContent = mode === 'login' ? '로그인' : '가입하기';
   $('auth-message').textContent = '';
+  $('password-recovery-panel').hidden = true; $('password-change-panel').hidden = true;
+  $('auth-tabs').hidden = false; $('auth-form').hidden = false; $('auth-reset-link').hidden = false;
 }
+async function sendPasswordReset() {
+  const email = $('auth-email').value.trim();
+  if (!email) { $('auth-message').textContent = '먼저 가입한 이메일 주소를 입력해 주세요.'; $('auth-email').focus(); return; }
+  if (!cloudClient) { $('auth-message').textContent = '클라우드 설정을 확인할 수 없습니다.'; return; }
+  $('auth-reset-link').disabled = true;
+  $('auth-message').textContent = '비밀번호 재설정 메일을 보내고 있습니다.';
+  try {
+    const redirectTo = `${window.location.origin}${window.location.pathname}`;
+    const { error } = await cloudClient.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) throw error;
+    $('auth-message').textContent = '재설정 메일을 보냈습니다. 이메일의 링크를 열어 새 비밀번호를 설정해 주세요.';
+  } catch (err) { $('auth-message').textContent = `메일 발송 실패: ${err.message || '잠시 후 다시 시도해 주세요.'}`; }
+  finally { $('auth-reset-link').disabled = false; }
+}
+async function completePasswordRecovery() {
+  const password=$('new-password').value, confirmPassword=$('confirm-new-password').value;
+  if (password.length<6) { $('auth-message').textContent='새 비밀번호는 6자 이상 입력해 주세요.'; return; }
+  if (password!==confirmPassword) { $('auth-message').textContent='두 비밀번호가 서로 다릅니다.'; return; }
+  const btn=$('save-new-password-btn'); btn.disabled=true; btn.textContent='저장 중…';
+  try {
+    const { error } = await cloudClient.auth.updateUser({password});
+    if (error) throw error;
+    $('new-password').value=''; $('confirm-new-password').value='';
+    $('password-recovery-panel').hidden=true; $('auth-tabs').hidden=false; $('auth-form').hidden=false; $('auth-reset-link').hidden=false;
+    $('auth-message').textContent='비밀번호를 변경했습니다. 새 비밀번호로 로그인할 수 있습니다.';
+    if (cloudUser) closeModal('auth-backdrop');
+  } catch (err) { $('auth-message').textContent=`비밀번호 변경 실패: ${err.message || ''}`; }
+  finally { btn.disabled=false; btn.textContent='새 비밀번호 저장'; }
+}
+async function changePassword() {
+  const password=$('change-new-password').value, confirmPassword=$('change-confirm-password').value;
+  if (password.length<6) { $('auth-message').textContent='새 비밀번호는 6자 이상 입력해 주세요.'; return; }
+  if (password!==confirmPassword) { $('auth-message').textContent='두 비밀번호가 서로 다릅니다.'; return; }
+  const btn=$('save-changed-password-btn'); btn.disabled=true; btn.textContent='변경 중…';
+  try {
+    const { error }=await cloudClient.auth.updateUser({password});
+    if (error) throw error;
+    $('change-new-password').value=''; $('change-confirm-password').value='';
+    $('password-change-panel').hidden=true; closeModal('auth-backdrop'); showToast('비밀번호를 변경했습니다.');
+  } catch(err) { $('auth-message').textContent=`비밀번호 변경 실패: ${err.message || ''}`; }
+  finally { btn.disabled=false; btn.textContent='비밀번호 변경'; }
+}
+
 async function submitAuth(event) {
   event.preventDefault();
   if (!cloudClient) { $('auth-message').textContent = '클라우드 설정을 확인할 수 없습니다.'; return; }
