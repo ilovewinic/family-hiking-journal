@@ -175,3 +175,539 @@
   .stats-person-tabs button{padding:8px 10px;font-size:10px}
   .stats-person-summary{font-size:9px}
 }
+
+
+/* Enchanted alpine atelier theme — warm parchment, brass, forest and mist */
+:root{
+  --green:#344f43;
+  --green-dark:#263d34;
+  --green-soft:#e7eee6;
+  --ink:#293b36;
+  --muted:#7a8178;
+  --line:#e5dac7;
+  --paper:#f4ecdc;
+  --white:#fffaf0;
+  --orange:#b8754f;
+  --shadow:0 20px 55px rgba(57,52,39,.13);
+  color:var(--ink);
+  background:var(--paper);
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR","Malgun Gothic",sans-serif;
+}
+html{scroll-behavior:smooth;background:#f4ecdc}
+body{
+  color:#293b36;
+  background:
+    radial-gradient(ellipse at 8% 4%,rgba(221,204,164,.24),transparent 34rem),
+    radial-gradient(ellipse at 92% 22%,rgba(180,198,193,.22),transparent 35rem),
+    linear-gradient(180deg,#f6efdf 0%,#f2eadb 44%,#f7f1e5 100%);
+  letter-spacing:-.012em;
+}
+body:before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  opacity:.18;
+  background-image:repeating-linear-gradient(0deg,rgba(108,91,62,.035) 0,rgba(108,91,62,.035) 1px,transparent 1px,transparent 4px);
+}
+h1,h2,h3,h4,.brand-copy strong,.expanded-stats-heading h2,.album-heading h2,.map-heading h2,.mountain-progress-heading h2{
+  font-family:"Iowan Old Style","Palatino Linotype","Noto Serif KR","Batang",Georgia,serif;
+  font-weight:700;
+  letter-spacing:-.045em;
+}
+button,input,select,textarea{font-family:inherit}
+::selection{background:#d7c49a;color:#263d34}
+.site-header{
+  min-height:78px;
+  height:auto;
+  padding:10px clamp(18px,3.5vw,52px);
+  gap:clamp(14px,2.2vw,32px);
+  border-bottom:1px solid rgba(183,154,106,.28);
+  background:rgba(248,242,229,.91);
+  box-shadow:0 8px 30px rgba(66,56,40,.07);
+  backdrop-filter:blur(18px) saturate(1.15);
+}
+.brand{gap:12px}
+.brand-mark{width:46px;height:46px;filter:drop-shadow(0 4px 8px rgba(52,79,67,.18))}
+.brand-mark svg{border-radius:15px}
+.brand-copy{gap:3px}
+.brand-copy strong{font-size:18px;color:#2d473b;letter-spacing:-.055em}
+.brand-copy small{font-size:10px;color:#8b806d;letter-spacing:.035em}
+.top-nav{gap:5px}
+.nav-link{
+  padding:11px 15px;
+  border:1px solid transparent;
+  border-radius:999px;
+  color:#74766c;
+  font-size:12px;
+  font-weight:650;
+  transition:background .2s,border-color .2s,color .2s,transform .2s;
+}
+.nav-link:hover{background:rgba(255,255,255,.65);border-color:#e8ddc9;color:#344f43;transform:translateY(-1px)}
+.nav-link.active{
+  color:#fff9ec;
+  background:linear-gradient(135deg,#405f4d,#2d493d);
+  border-color:#405f4d;
+  box-shadow:0 5px 14px rgba(49,77,62,.2),inset 0 1px rgba(255,255,255,.14);
+}
+.header-actions{gap:7px}
+.sync-pill{
+  border:1px solid #e2d5bd;
+  background:rgba(255,250,240,.82);
+  color:#766d5d;
+  padding:8px 12px;
+  font-size:10px;
+}
+.status-dot{background:#bd8a50}
+.sync-pill.cloud .status-dot{background:#62846b}
+.icon-button,.secondary-button{
+  border:1px solid #e4d8c5;
+  background:#fffaf0;
+  color:#5e695d;
+  border-radius:12px;
+  box-shadow:0 2px 5px rgba(60,54,40,.035);
+  transition:transform .18s,box-shadow .18s,background .18s;
+}
+.icon-button:hover,.secondary-button:hover{background:#fffdf7;transform:translateY(-1px);box-shadow:0 5px 12px rgba(60,54,40,.09)}
+.add-button{
+  border:1px solid #304c3e;
+  border-radius:12px;
+  background:linear-gradient(135deg,#486b53,#2e4e40);
+  color:#fff9ec;
+  box-shadow:0 6px 16px rgba(43,73,57,.2),inset 0 1px rgba(255,255,255,.16);
+  transition:transform .18s,box-shadow .18s,filter .18s;
+  letter-spacing:-.02em;
+}
+.add-button:hover{background:linear-gradient(135deg,#52765d,#345745);filter:saturate(1.06);transform:translateY(-1px);box-shadow:0 9px 20px rgba(43,73,57,.24)}
+.account-name-pill{background:#f8efdc;border-color:#dfceb0;color:#5e634f}
+.page-shell{max-width:1540px;padding:38px clamp(18px,3.5vw,52px) 68px}
+.intro-row{align-items:center;gap:30px;margin-bottom:30px}
+.eyebrow{
+  color:#9c7546;
+  font-size:9px;
+  letter-spacing:.22em;
+  font-weight:850;
+}
+.eyebrow:after{content:"  ✧";color:#c2985b;letter-spacing:0}
+.intro-row h1{
+  color:#2b4539;
+  font-size:clamp(32px,4vw,48px);
+  line-height:1.08;
+  text-shadow:0 1px rgba(255,255,255,.7);
+}
+.subheading{max-width:560px;color:#7b8076;font-size:13px;line-height:1.8}
+.quick-stats{
+  padding:14px 4px;
+  border:1px solid #e6dac5;
+  border-radius:18px;
+  background:rgba(255,251,242,.83);
+  box-shadow:0 8px 22px rgba(70,58,39,.055);
+  backdrop-filter:blur(8px);
+}
+.quick-stats>div{min-width:100px;padding:0 19px;border-color:#eee5d7}
+.quick-stats strong{font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;color:#365342;font-size:26px}
+.quick-stats span{color:#8a8274;font-size:9px;letter-spacing:.03em}
+.family-map-section,.mountain-progress-section,.expanded-stats-section,.album-section{
+  border:1px solid #e5dac6;
+  border-radius:24px;
+  background:rgba(255,250,240,.88);
+  box-shadow:0 12px 32px rgba(62,54,39,.065);
+}
+.family-map-section{
+  position:relative;
+  overflow:hidden;
+  padding:24px;
+  margin-bottom:30px;
+  background:linear-gradient(145deg,rgba(255,251,243,.97),rgba(239,238,222,.9));
+}
+.family-map-section:before,.expanded-stats-section:before,.album-section:before{
+  content:"";
+  position:absolute;
+  top:0;right:0;
+  width:180px;height:180px;
+  pointer-events:none;
+  background:radial-gradient(circle at top right,rgba(192,157,101,.14),transparent 68%);
+}
+.map-heading{margin-bottom:17px}
+.map-heading h2,.mountain-progress-heading h2,.expanded-stats-heading h2,.album-heading h2{color:#2d483b;font-size:25px}
+.map-heading p:not(.eyebrow),.mountain-progress-heading p:not(.eyebrow),.expanded-stats-heading p:not(.eyebrow),.album-heading p:not(.eyebrow){
+  color:#858276;font-size:11px;line-height:1.7
+}
+.map-count{
+  border:1px solid #dfcfad;
+  background:#f8efd9;
+  color:#80643b;
+  padding:8px 13px;
+  font-size:10px;
+}
+.hiking-map{height:530px;border:1px solid #d9d7c7;border-radius:17px;background:#e3e9df;box-shadow:inset 0 1px 4px rgba(48,60,45,.08)}
+.map-legend{margin-top:12px;color:#8c877b;font-size:10px}
+.legend-dot{background:#9a7949}
+.mountain-progress-section{
+  padding:24px;
+  margin-bottom:30px;
+}
+.mountain-progress-heading{margin-bottom:18px}
+.mountain-progress-mark{
+  width:46px;height:46px;border:1px solid #e6d8bc;border-radius:15px;
+  background:linear-gradient(145deg,#f6edda,#e9e7d8);
+  color:#8e7145;box-shadow:inset 0 1px rgba(255,255,255,.85)
+}
+.mountain-progress-grid{gap:13px}
+.mountain-progress-card{
+  position:relative;
+  overflow:hidden;
+  padding:18px;
+  border:1px solid #e7ddcb;
+  border-radius:17px;
+  background:linear-gradient(145deg,#fffdf7,#f4f0e5);
+  box-shadow:0 4px 12px rgba(66,54,38,.035);
+}
+.mountain-progress-card:after{
+  content:"✧";position:absolute;right:13px;top:9px;
+  color:rgba(161,128,78,.26);font-size:18px
+}
+.mountain-progress-card .progress-label{color:#7c7a6c;font-size:10px}
+.mountain-progress-card strong{color:#344f43;font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;font-size:31px}
+.forest-progress{background:linear-gradient(145deg,#f5f8ed,#e9eee2)}
+.bac-progress{background:linear-gradient(145deg,#f1f5f4,#e7ece8)}
+.shared-progress{background:linear-gradient(145deg,#fbf3e5,#f3e8d5)}
+.mountain-progress-note{color:#918778;font-size:10px;line-height:1.7}
+.expanded-stats-section{
+  position:relative;
+  overflow:hidden;
+  padding:28px;
+  margin-bottom:32px;
+  background:linear-gradient(155deg,rgba(255,251,243,.98),rgba(246,239,224,.94));
+}
+.expanded-stats-heading{position:relative;z-index:1;margin-bottom:8px}
+.expanded-stats-heading h2,.album-heading h2{font-size:29px}
+.stats-person-tabs{position:relative;z-index:1;margin:20px 0 9px;gap:7px}
+.stats-person-tabs button{
+  min-width:74px;
+  padding:9px 16px;
+  border:1px solid #e3d6bf;
+  border-radius:999px;
+  background:#fffaf0;
+  color:#797568;
+  font-size:11px;
+  font-weight:750;
+  box-shadow:0 2px 5px rgba(62,54,39,.035);
+}
+.stats-person-tabs button:hover{border-color:#c6ac7c;color:#4d624e}
+.stats-person-tabs button.selected{
+  color:#fff8e9;
+  border-color:#3d5b48;
+  background:linear-gradient(135deg,#4b6b51,#2d493c);
+  box-shadow:0 5px 13px rgba(49,77,62,.19),inset 0 1px rgba(255,255,255,.16)
+}
+.stats-person-summary{color:#8a8375;font-size:10px}
+.expanded-stats-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin-top:18px}
+.expanded-stat-card{
+  min-height:120px;
+  position:relative;
+  overflow:hidden;
+  padding:19px 20px;
+  gap:9px;
+  border:1px solid #e5dac6;
+  border-radius:17px;
+  background:linear-gradient(145deg,#fffdf7,#f5f0e4);
+  box-shadow:0 6px 16px rgba(64,54,38,.045);
+}
+.expanded-stat-card:after{
+  content:"✧";position:absolute;right:15px;top:11px;
+  color:rgba(174,139,82,.32);font-size:19px
+}
+.expanded-stat-card span{color:#888272;font-size:10px;font-weight:750;letter-spacing:.015em}
+.expanded-stat-card strong{
+  color:#304d3d;
+  font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;
+  font-size:clamp(24px,2.6vw,34px);
+  letter-spacing:-.055em;
+  line-height:1.08;
+}
+.expanded-stat-card small{color:#9a9181;font-size:9px}
+.stats-panels{gap:14px;margin-top:15px}
+.stats-panel{
+  padding:20px;
+  border:1px solid #e6dccb;
+  border-radius:18px;
+  background:rgba(255,252,245,.88);
+  box-shadow:0 5px 16px rgba(64,54,38,.035);
+}
+.stats-panel h3{color:#3a5142;font-size:16px;letter-spacing:-.035em;margin-bottom:16px}
+.year-stat-row{font-size:11px}
+.year-stat-row>b{color:#7e7a6c}
+.year-stat-row>strong{color:#365542}
+.stat-bar{background:#eee9dd;height:9px}
+.stat-bar i{background:linear-gradient(90deg,#7f9a7c,#c2a16b)}
+.month-stats{height:145px}
+.month-stat span{font-size:9px;color:#8c8678}
+.month-stat>i{height:88px;background:#f0ebdf}
+.month-stat>i>b{background:linear-gradient(180deg,#8da48a,#bc9b66)}
+.month-stat strong{color:#6e715f;font-size:10px}
+.highlight-stats p,.favorite-mountains p{font-size:11px}
+.highlight-stats span,.favorite-mountains span{color:#898272}
+.highlight-stats strong,.favorite-mountains strong{color:#385440}
+.participant-stats-note{color:#8d8576;line-height:1.75}
+.participant-comparison-table{background:#fffdf7;font-size:10px}
+.participant-comparison-table thead th{background:#f2ecdf;color:#847b69}
+.participant-comparison-table tbody th{color:#34513f}
+.participant-comparison-table tbody td{color:#686e63}
+.combination-stat-row{border-color:#eee5d7}
+.combination-stat-row strong{color:#3e5745;font-size:11px}
+.combination-stat-row small{color:#928979}
+.combination-stat-row>b{color:#987445}
+.album-section{
+  position:relative;
+  overflow:hidden;
+  padding:27px;
+  background:linear-gradient(150deg,rgba(255,251,242,.98),rgba(239,238,223,.94));
+}
+.album-heading{position:relative;z-index:1}
+.album-filters{margin:19px 0 13px}
+.album-mode-tabs button,.album-season-tabs button,.album-year-tabs button,.album-month-tabs button{
+  border:1px solid #e4d9c7;
+  background:#fffaf0;
+  color:#7b786b;
+  box-shadow:0 2px 5px rgba(62,54,39,.025);
+  transition:background .18s,border-color .18s,transform .18s;
+}
+.album-mode-tabs button:hover,.album-season-tabs button:hover,.album-year-tabs button:hover,.album-month-tabs button:hover{border-color:#c5ad82;transform:translateY(-1px)}
+.album-mode-tabs button.selected,.album-season-tabs button.selected{
+  background:#405e49;border-color:#405e49;color:#fff8ea
+}
+.album-year-tabs button.selected,.album-month-tabs button.selected{background:#405e49;border-color:#405e49;color:#fff8ea}
+.album-year-tabs button span,.album-month-tabs button span{background:#f0e9db;color:#817968}
+.album-year-tabs button.selected span,.album-month-tabs button.selected span{background:#ffffff2c;color:#fff8ea}
+.album-summary{color:#8c8373;font-size:10px}
+.album-year-heading h3{font-size:21px;color:#34513f}
+.album-year-heading span{background:#eee7d6;color:#8a7148}
+.album-gallery{gap:13px}
+.album-photo-card{border-radius:16px;box-shadow:0 8px 20px rgba(52,48,36,.1);background:#e8e6d9}
+.album-photo-card img{transition:transform .45s cubic-bezier(.2,.7,.2,1),filter .3s}
+.album-photo-card:hover img{transform:scale(1.055);filter:saturate(1.08)}
+.album-photo-shade{background:linear-gradient(transparent,rgba(29,44,36,.82));padding:34px 13px 12px}
+.album-photo-shade b{font-size:13px}
+.album-photo-shade small{font-size:10px;color:#f5eddd}
+.album-empty{color:#77796d}
+.toolbar{gap:13px;margin-bottom:16px}
+.search-box{
+  border:1px solid #e5dbc9;
+  border-radius:14px;
+  background:rgba(255,251,243,.91);
+  box-shadow:0 3px 9px rgba(64,54,38,.035);
+}
+.search-box input{font-size:12px}
+.search-box kbd{background:#f4eddf;border-color:#e8decc;color:#928773}
+.sort-wrap{color:#888273}
+.sort-wrap select{
+  border:1px solid #e4d9c7;border-radius:12px;background:#fffaf0;color:#566657
+}
+.filter-chip{
+  padding:8px 14px;
+  border:1px solid #e5dac6;
+  border-radius:999px;
+  background:#fffaf1;
+  color:#777769;
+  font-size:10px;
+}
+.filter-chip.selected{background:#405e49;border-color:#405e49;color:#fff8ea}
+.filter-chip span{color:#a49a86}
+.filter-chip.selected span{color:#f5ead1}
+.results-line{color:#8b8579;font-size:10px}
+.results-line #results-label{color:#4a604e}
+.results-line #filter-label{border-color:#e4d9c7}
+.record-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+.record-card{
+  border:1px solid #e6dccb;
+  border-radius:20px;
+  background:rgba(255,251,243,.94);
+  box-shadow:0 7px 22px rgba(64,54,38,.055);
+  transition:transform .25s cubic-bezier(.2,.7,.2,1),box-shadow .25s;
+}
+.record-card:hover{transform:translateY(-5px);box-shadow:0 16px 32px rgba(64,54,38,.12)}
+.card-photo{height:clamp(190px,22vw,260px);background:#e9e8db}
+.card-photo img{filter:saturate(.93) contrast(.98)}
+.date-ribbon{
+  background:rgba(48,78,60,.94);
+  border:1px solid rgba(255,245,220,.28);
+  backdrop-filter:blur(8px);
+  font-size:10px;
+}
+.card-photo-count{background:rgba(38,48,39,.72);backdrop-filter:blur(8px)}
+.card-content{padding:18px 19px 19px}
+.card-number{color:#ac8150}
+.region-tag{background:#edf0e5;color:#5e755e;border-radius:999px;font-size:9px}
+.card-content h2{font-family:"Iowan Old Style","Palatino Linotype","Noto Serif KR",Georgia,serif;color:#304a3c;font-size:22px}
+.card-elevation{color:#977447;font-size:10px}
+.card-description{color:#7f8177;font-size:11px;line-height:1.8}
+.card-footer{border-color:#eee6d9;color:#948b7b;font-size:10px}
+.card-footer .restaurant-teaser{color:#6f765f}
+.empty-state{border-color:#e2d5bd;border-radius:22px;background:#fffaf1}
+.empty-state h2{font-family:"Iowan Old Style","Palatino Linotype","Noto Serif KR",Georgia,serif;color:#344f43;font-size:24px}
+.empty-state p{color:#898273;font-size:12px}
+.notice-bar{
+  border:1px solid #e6d8be;
+  background:rgba(248,242,226,.92);
+  color:#7e7969;
+  border-radius:13px;
+}
+.notice-icon{color:#a27e4d}
+.site-footer{
+  border-color:#e6dccb;
+  background:rgba(250,245,234,.9);
+  color:#938978;
+  font-size:10px;
+}
+.site-footer span:first-child{color:#536c56}
+.modal-backdrop{background:rgba(34,43,36,.56);backdrop-filter:blur(8px)}
+.modal{
+  border:1px solid #e3d5bb;
+  border-radius:22px;
+  background:#fffaf0;
+  box-shadow:0 26px 80px rgba(25,33,27,.26);
+}
+.modal-header{border-color:#eee5d7}
+.modal-header h2{font-family:"Iowan Old Style","Palatino Linotype","Noto Serif KR",Georgia,serif;color:#304a3c;font-size:27px}
+.modal-subtitle,.section-help{color:#8b8374}
+.close-button{border-color:#e7dccb;background:#fbf5e8;color:#746d5e}
+.form-section{border-color:#eee5d8}
+.form-section h3{font-size:16px;color:#3b5243}
+.form-section h3 span{background:#eee8d7;color:#9a7849}
+.field>span{color:#666e60;font-size:11px}
+.field input,.field select,.field textarea{
+  border:1px solid #e3dacb;
+  border-radius:11px;
+  background:#fffdf8;
+  color:#34473d;
+  font-size:12px;
+}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:#a98a59;outline:3px solid rgba(185,151,91,.15)}
+.upload-zone{
+  border:1px dashed #d7c8a9;
+  border-radius:14px;
+  background:#f8f3e7;
+}
+.upload-zone:hover{border-color:#a88a5b;background:#f5efdf}
+.upload-symbol{background:#eae6d5;color:#536e54}
+.summit-section{background:#f7f6ec}
+.food-section{background:#fbf4e9}
+.food-upload{background:#f7eee2;border-color:#e5d2bb}
+.photo-preview{border-color:#e5d9c7;border-radius:12px;background:#eee8dc}
+.photo-preview .photo-kind{background:rgba(255,250,240,.93);color:#5c6859}
+.photo-preview-editable{background:#fffaf0}
+.photo-caption-input{border-color:#e5dac8;background:#fffdf8}
+.photo-preview-actions button{border-color:#e3d8c6;background:#fffaf0;color:#687163}
+.photo-preview-actions .photo-cover-button.selected{background:#e6eddf;border-color:#aab99d;color:#3f6246}
+.form-actions{border-color:#eee4d5}
+.detail-modal{background:#fffaf0}
+.detail-cover{background:#e8e9dc}
+.detail-main{padding:30px clamp(20px,4vw,38px) 36px}
+.detail-main h2{font-family:"Iowan Old Style","Palatino Linotype","Noto Serif KR",Georgia,serif;color:#304a3c;font-size:36px}
+.detail-subline{color:#8d754d}
+.detail-facts{border-color:#e7dccb;border-radius:15px;background:#f8f3e8}
+.detail-fact{border-color:#e7dccb}
+.detail-fact span{color:#8f887a}
+.detail-section{border-color:#eee5d7}
+.detail-section h3{font-family:"Iowan Old Style","Palatino Linotype","Noto Serif KR",Georgia,serif;color:#3b5543;font-size:17px}
+.detail-section p{color:#70776d;font-size:12px}
+.detail-gallery img{background:#efeadf}
+.detail-photo-save{border-color:#e3d7c5;background:#f9f3e7;color:#65705e}
+.restaurant-panel{background:#f7f1e5;border-color:#e9ddca}
+.restaurant-panel h4{color:#39533f;font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif}
+.backup-card{border-color:#e5dac7;border-radius:15px;background:#fffdf7}
+.backup-icon{background:#e9eddf;color:#536e54}
+.backup-tip{background:#f5efdf}
+.help-note{background:#f7f0df;border-color:#e8d9b8;color:#81704f}
+.auth-tabs{background:#eee9dc}
+.auth-tabs button.selected{color:#3e6148}
+.password-recovery-panel{background:#f7f3e8;border-color:#e5dac7}
+.photo-lightbox{background:rgba(19,28,24,.97)}
+.lightbox-close,.lightbox-tools{border-color:rgba(239,225,195,.26);background:rgba(31,42,35,.85)}
+.toast{background:#304b3d;border:1px solid rgba(255,246,220,.16);box-shadow:0 12px 35px rgba(28,38,31,.25)}
+.toast.error{background:#8e5140}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid rgba(175,143,88,.32);outline-offset:2px}
+@media(max-width:1120px){
+  .site-header{background:rgba(248,242,229,.96);gap:12px}
+  .top-nav{border-color:#e8decc}
+  .header-actions{gap:6px}
+}
+@media(max-width:760px){
+  .site-header{padding:9px 12px;gap:7px}
+  .brand{flex-basis:100%}
+  .brand-mark{width:40px;height:40px}
+  .brand-copy strong{font-size:16px}
+  .top-nav{padding-top:8px}
+  .top-nav .nav-link{padding:8px 7px;font-size:10px}
+  .header-actions .add-button{padding:9px 12px;font-size:10px}
+  .page-shell{padding:23px 13px 45px}
+  .intro-row{display:grid;gap:17px;margin-bottom:22px}
+  .intro-row h1{font-size:35px;line-height:1.12}
+  .subheading{font-size:11px;margin-top:8px}
+  .quick-stats{width:100%;justify-content:space-around;padding:12px 0;border-radius:15px}
+  .quick-stats>div{flex:1;min-width:0;padding:0 8px}
+  .quick-stats strong{font-size:22px}
+  .family-map-section,.mountain-progress-section,.expanded-stats-section,.album-section{padding:16px;border-radius:18px;margin-bottom:21px}
+  .map-heading h2,.mountain-progress-heading h2{font-size:21px}
+  .hiking-map{height:390px;border-radius:13px}
+  .mountain-progress-grid{gap:7px}
+  .mountain-progress-card{padding:12px 10px;border-radius:13px}
+  .mountain-progress-card strong{font-size:23px}
+  .mountain-progress-card .progress-label{font-size:9px}
+  .expanded-stats-heading h2,.album-heading h2{font-size:23px}
+  .expanded-stats-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px}
+  .expanded-stat-card{min-height:105px;padding:13px;border-radius:13px;gap:7px}
+  .expanded-stat-card span{font-size:9px}
+  .expanded-stat-card strong{font-size:24px}
+  .stats-panels{grid-template-columns:1fr;gap:9px;margin-top:10px}
+  .stats-panel{padding:14px;border-radius:14px}
+  .stats-panel h3{font-size:14px}
+  .stats-person-tabs{flex-wrap:nowrap;overflow-x:auto;padding:2px 1px 8px;scrollbar-width:thin}
+  .stats-person-tabs button{flex:0 0 auto;min-width:62px;padding:8px 11px}
+  .month-stats{height:128px}
+  .month-stat>i{height:72px}
+  .album-filters{display:grid;gap:9px}
+  .album-mode-tabs,.album-season-tabs{gap:5px}
+  .album-mode-tabs button,.album-season-tabs button{padding:8px 10px;font-size:10px}
+  .album-gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .album-photo-card{border-radius:12px}
+  .album-photo-shade{padding:27px 9px 9px}
+  .album-photo-shade b{font-size:11px}
+  .toolbar{display:grid;gap:9px}
+  .search-box{min-height:43px}
+  .record-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+  .record-card{border-radius:14px}
+  .card-photo{height:clamp(135px,38vw,200px)}
+  .card-content{padding:12px}
+  .card-content h2{font-size:17px}
+  .card-description{font-size:10px;line-height:1.6;min-height:33px}
+  .card-footer{margin-top:10px;padding-top:9px;gap:6px;font-size:9px}
+  .record-grid .mountain-badge{font-size:7px}
+  .notice-bar{font-size:10px;align-items:flex-start}
+  .modal{border-radius:18px}
+  .modal-header{padding:19px 18px 15px}
+  .modal-header h2{font-size:22px}
+  .form-section{padding:17px 18px 19px}
+  .detail-main h2{font-size:29px}
+  .detail-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .detail-fact:nth-child(2){border-right:0}
+  .detail-fact:nth-child(-n+2){border-bottom:1px solid #e7dccb}
+  .detail-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .backup-card{margin:13px 16px 0;flex-wrap:wrap}
+  .backup-tip{margin:13px 16px 10px}
+  .backup-status{padding:0 16px}
+  .site-footer{flex-wrap:wrap;gap:8px}
+}
+@media(max-width:420px){
+  .record-grid{grid-template-columns:1fr}
+  .card-photo{height:clamp(190px,60vw,250px)}
+  .quick-stats strong{font-size:20px}
+  .mountain-progress-card{padding:10px 8px}
+  .mountain-progress-card strong{font-size:21px}
+  .participant-comparison-table{min-width:570px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
+}
