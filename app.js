@@ -402,9 +402,10 @@ function bindEvents() {
   $('lightbox-prev').addEventListener('click', () => movePhotoViewer(-1));
   $('lightbox-next').addEventListener('click', () => movePhotoViewer(1));
   $('photo-lightbox').addEventListener('click', e => { if (e.target === $('photo-lightbox')) closePhotoViewer(); });
-  let touchStartX = 0;
-  $('photo-lightbox').addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].clientX; }, {passive:true});
-  $('photo-lightbox').addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - touchStartX; if (Math.abs(dx) > 45) movePhotoViewer(dx < 0 ? 1 : -1); }, {passive:true});
+  $('lightbox-zoom-in').addEventListener('click', () => setPhotoZoom(photoZoom * 1.5));
+  $('lightbox-zoom-out').addEventListener('click', () => setPhotoZoom(photoZoom / 1.5));
+  $('lightbox-zoom-reset').addEventListener('click', resetPhotoZoom);
+  setupPhotoZoom();
   $('backup-backdrop').addEventListener('click', (e) => { if (e.target === $('backup-backdrop')) closeModal('backup-backdrop'); });
   $('help-backdrop').addEventListener('click', (e) => { if (e.target === $('help-backdrop')) closeModal('help-backdrop'); });
   document.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => closeModal(btn.dataset.close)));
@@ -768,6 +769,8 @@ async function saveCloudRecord(record, oldRecord) {
 
 let viewerPhotos = [];
 let viewerIndex = 0;
+let photoZoom = 1, photoPanX = 0, photoPanY = 0;
+let photoPointers = new Map(), photoGestureStart = null, pinchStartDistance = 0, pinchStartZoom = 1, lastPhotoTap = 0;
 function openPhotoViewer(clickedImage) {
   viewerPhotos = [...$('detail-content').querySelectorAll('.zoomable-photo')].filter(img => img.src);
   viewerIndex = Math.max(0, viewerPhotos.indexOf(clickedImage));
@@ -780,6 +783,7 @@ function openPhotoViewer(clickedImage) {
 function updatePhotoViewer() {
   const img = viewerPhotos[viewerIndex];
   if (!img) return;
+  resetPhotoZoom();
   $('lightbox-image').src = img.src;
   $('lightbox-image').alt = img.alt || '산행 사진';
   $('lightbox-caption').textContent = img.dataset.photoCaption || img.alt || '';
@@ -793,9 +797,43 @@ function movePhotoViewer(direction) {
   viewerIndex = (viewerIndex + direction + viewerPhotos.length) % viewerPhotos.length;
   updatePhotoViewer();
 }
+function setPhotoZoom(value) {
+  photoZoom = Math.max(1, Math.min(5, value));
+  if (photoZoom === 1) { photoPanX = 0; photoPanY = 0; }
+  const image = $('lightbox-image');
+  image.style.transform = `translate(${photoPanX}px, ${photoPanY}px) scale(${photoZoom})`;
+  image.style.cursor = photoZoom > 1 ? 'grab' : 'zoom-in';
+  $('lightbox-zoom-level').textContent = `${Math.round(photoZoom * 100)}%`;
+}
+function resetPhotoZoom() { photoZoom = 1; photoPanX = 0; photoPanY = 0; if ($('lightbox-image')) setPhotoZoom(1); }
+function setupPhotoZoom() {
+  const image = $('lightbox-image');
+  image.addEventListener('wheel', e => { e.preventDefault(); setPhotoZoom(photoZoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15)); }, {passive:false});
+  image.addEventListener('dblclick', e => { e.preventDefault(); setPhotoZoom(photoZoom > 1 ? 1 : 2); });
+  image.addEventListener('pointerdown', e => {
+    e.preventDefault(); image.setPointerCapture(e.pointerId);
+    photoPointers.set(e.pointerId, {x:e.clientX,y:e.clientY});
+    if (photoPointers.size === 1) photoGestureStart = {x:e.clientX,y:e.clientY,panX:photoPanX,panY:photoPanY};
+    if (photoPointers.size === 2) { const pts=[...photoPointers.values()]; pinchStartDistance=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y); pinchStartZoom=photoZoom; }
+  });
+  image.addEventListener('pointermove', e => {
+    if (!photoPointers.has(e.pointerId)) return;
+    photoPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if (photoPointers.size >= 2) { const pts=[...photoPointers.values()]; const d=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y); if (pinchStartDistance) setPhotoZoom(pinchStartZoom*d/pinchStartDistance); }
+    else if (photoZoom > 1 && photoGestureStart) { photoPanX=photoGestureStart.panX+e.clientX-photoGestureStart.x; photoPanY=photoGestureStart.panY+e.clientY-photoGestureStart.y; setPhotoZoom(photoZoom); }
+  });
+  const endPointer = e => {
+    const start=photoGestureStart; const current=photoPointers.get(e.pointerId);
+    if (photoPointers.size===1 && photoZoom===1 && start && current) { const dx=current.x-start.x; if (Math.abs(dx)>65) movePhotoViewer(dx<0?1:-1); else if (Math.hypot(dx,current.y-start.y)<8 && e.pointerType==='touch') { const now=Date.now(); if (now-lastPhotoTap<320) setPhotoZoom(photoZoom>1?1:2); lastPhotoTap=now; } }
+    photoPointers.delete(e.pointerId); photoGestureStart=null; if (photoPointers.size<2) pinchStartDistance=0;
+  };
+  image.addEventListener('pointerup',endPointer); image.addEventListener('pointercancel',endPointer);
+}
 function closePhotoViewer() {
   $('photo-lightbox').hidden = true;
   $('lightbox-image').src = '';
+  resetPhotoZoom();
+  photoPointers.clear();
   document.body.classList.remove('lightbox-open');
   viewerPhotos = [];
 }
