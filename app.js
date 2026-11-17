@@ -746,7 +746,9 @@ function collectParticipantNames() {
 }
 function isFamilyRecord(record) {
   const participants = getParticipantNames(record);
-  return participants.includes('수호') || participants.includes('현아');
+  if (Array.isArray(record?.participants)) return participants.includes('수호') || participants.includes('현아');
+  // 참여자 필드가 없던 예전 기록은 앨범의 기존 가족 필터 동작만 유지합니다.
+  return /가족|아들|딸|자녀|아이|부부|아빠|엄마|아내|남편|부모님|형제|자매/i.test(String(record?.companions || ''));
 }
 function getSeason(date) {
   const month = Number(String(date || '').split('-')[1] || 0);
@@ -806,7 +808,7 @@ function renderParticipantStats() {
     const mountains = new Set(mine.map(record => String(record.name || '').trim().toLocaleLowerCase('ko-KR')).filter(Boolean));
     const longest = mine.filter(record => Number(record.distance) > 0).sort((a,b) => Number(b.distance)-Number(a.distance))[0];
     const years = {};
-    mine.forEach(record => { if (/^\\d{4}-\\d{2}-\\d{2}$/.test(String(record.date || ''))) { const year=record.date.slice(0,4); years[year]=(years[year]||0)+1; } });
+    mine.forEach(record => { if (/^\d{4}-\d{2}-\d{2}$/.test(String(record.date || ''))) { const year=record.date.slice(0,4); years[year]=(years[year]||0)+1; } });
     const yearText = Object.entries(years).sort((a,b)=>b[0].localeCompare(a[0])).map(([year,count])=>`<span><b>${esc(year)}년</b> ${count}회</span>`).join('');
     return `<article class="participant-stat-card"><h4>${esc(name)}</h4><div class="participant-stat-metrics"><div><span>산행 횟수</span><strong>${mine.length}회</strong></div><div><span>누적 거리</span><strong>${km.toFixed(1)}km</strong></div><div><span>누적 시간</span><strong>${fmtDuration(minutes)}</strong><small>시간 기록 ${timed.length}건</small></div><div><span>다른 산</span><strong>${mountains.size}곳</strong></div><div><span>최장 산행</span><strong>${longest ? `${esc(longest.name)} · ${Number(longest.distance).toFixed(1)}km` : '—'}</strong></div></div><div class="participant-year-list"><b>연도별</b> ${yearText || '<span>날짜 기록 없음</span>'}</div></article>`;
   }).join('') : '<p class="empty-help">참여자를 선택해 산행을 저장하면 사람별 기록이 여기에 쌓입니다.</p>';
