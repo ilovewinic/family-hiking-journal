@@ -155,3 +155,23 @@
   .participant-stat-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
   .participant-option{padding:7px 10px;font-size:10px}
 }
+
+
+/* Person selector and comparison view for the main hiking statistics */
+.stats-person-tabs{margin:17px 0 8px;gap:7px}
+.stats-person-tabs button{min-width:66px}
+.stats-person-summary{margin:0 2px 14px;color:#829087;font-size:10px;line-height:1.55}
+.participant-stats{display:block;min-width:0}
+.participant-stats-table-wrap{width:100%;overflow-x:auto;border:1px solid #e7ece7;border-radius:10px}
+.participant-comparison-table{width:100%;min-width:600px;border-collapse:collapse;background:#fff;font-size:10px;font-variant-numeric:tabular-nums}
+.participant-comparison-table th,.participant-comparison-table td{padding:11px 9px;border-bottom:1px solid #edf1ed;text-align:right;white-space:nowrap}
+.participant-comparison-table thead th{background:#f5f8f5;color:#6e7b70;font-size:9px;font-weight:800}
+.participant-comparison-table th:first-child,.participant-comparison-table td:first-child{text-align:left}
+.participant-comparison-table tbody th{color:#31543a;font-weight:800}
+.participant-comparison-table tbody td{color:#5f6f62}
+.participant-comparison-table tbody tr:last-child th,.participant-comparison-table tbody tr:last-child td{border-bottom:0}
+@media(max-width:760px){
+  .stats-person-tabs{gap:5px}
+  .stats-person-tabs button{padding:8px 10px;font-size:10px}
+  .stats-person-summary{font-size:9px}
+}
