@@ -196,6 +196,14 @@
       <p class="auth-footnote">관리자 계정은 최초로 가입·로그인해야 합니다. 가족 계정은 가입 및 이메일 인증 후 관리자가 가족 관리에서 등록합니다.</p>
     </section>
   </div>
+  <!-- Fullscreen photo viewer -->
+  <div class="photo-lightbox" id="photo-lightbox" hidden role="dialog" aria-modal="true" aria-label="사진 전체화면 보기">
+    <button class="lightbox-close" id="lightbox-close" type="button" aria-label="사진 닫기">×</button>
+    <button class="lightbox-nav lightbox-prev" id="lightbox-prev" type="button" aria-label="이전 사진">‹</button>
+    <figure class="lightbox-figure"><img id="lightbox-image" alt=""><figcaption id="lightbox-caption"></figcaption></figure>
+    <button class="lightbox-nav lightbox-next" id="lightbox-next" type="button" aria-label="다음 사진">›</button>
+    <div class="lightbox-counter" id="lightbox-counter"></div>
+  </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

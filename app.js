@@ -397,10 +397,18 @@ function bindEvents() {
   $('auth-form').addEventListener('submit', submitAuth);
   $('form-backdrop').addEventListener('click', (e) => { if (e.target === $('form-backdrop')) closeModal('form-backdrop'); });
   $('detail-backdrop').addEventListener('click', (e) => { if (e.target === $('detail-backdrop')) closeModal('detail-backdrop'); });
+  $('detail-content').addEventListener('click', e => { const img = e.target.closest('.zoomable-photo'); if (img) openPhotoViewer(img); });
+  $('lightbox-close').addEventListener('click', closePhotoViewer);
+  $('lightbox-prev').addEventListener('click', () => movePhotoViewer(-1));
+  $('lightbox-next').addEventListener('click', () => movePhotoViewer(1));
+  $('photo-lightbox').addEventListener('click', e => { if (e.target === $('photo-lightbox')) closePhotoViewer(); });
+  let touchStartX = 0;
+  $('photo-lightbox').addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].clientX; }, {passive:true});
+  $('photo-lightbox').addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - touchStartX; if (Math.abs(dx) > 45) movePhotoViewer(dx < 0 ? 1 : -1); }, {passive:true});
   $('backup-backdrop').addEventListener('click', (e) => { if (e.target === $('backup-backdrop')) closeModal('backup-backdrop'); });
   $('help-backdrop').addEventListener('click', (e) => { if (e.target === $('help-backdrop')) closeModal('help-backdrop'); });
   document.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => closeModal(btn.dataset.close)));
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-backdrop:not([hidden])').forEach(m => closeModal(m.id)); });
+  document.addEventListener('keydown', e => { if (!$('photo-lightbox').hidden) { if (e.key === 'Escape') closePhotoViewer(); else if (e.key === 'ArrowRight') movePhotoViewer(1); else if (e.key === 'ArrowLeft') movePhotoViewer(-1); return; } if (e.key === 'Escape') document.querySelectorAll('.modal-backdrop:not([hidden])').forEach(m => closeModal(m.id)); });
 }
 
 function setNav(nav) {
@@ -758,6 +766,40 @@ async function saveCloudRecord(record, oldRecord) {
   return await hydrateCloudRecord(clean);
 }
 
+let viewerPhotos = [];
+let viewerIndex = 0;
+function openPhotoViewer(clickedImage) {
+  viewerPhotos = [...$('detail-content').querySelectorAll('.zoomable-photo')].filter(img => img.src);
+  viewerIndex = Math.max(0, viewerPhotos.indexOf(clickedImage));
+  if (!viewerPhotos.length) return;
+  $('photo-lightbox').hidden = false;
+  document.body.classList.add('lightbox-open');
+  updatePhotoViewer();
+  $('lightbox-close').focus();
+}
+function updatePhotoViewer() {
+  const img = viewerPhotos[viewerIndex];
+  if (!img) return;
+  $('lightbox-image').src = img.src;
+  $('lightbox-image').alt = img.alt || '산행 사진';
+  $('lightbox-caption').textContent = img.dataset.photoCaption || img.alt || '';
+  $('lightbox-counter').textContent = `${viewerIndex + 1} / ${viewerPhotos.length}`;
+  const multiple = viewerPhotos.length > 1;
+  $('lightbox-prev').hidden = !multiple;
+  $('lightbox-next').hidden = !multiple;
+}
+function movePhotoViewer(direction) {
+  if (!viewerPhotos.length) return;
+  viewerIndex = (viewerIndex + direction + viewerPhotos.length) % viewerPhotos.length;
+  updatePhotoViewer();
+}
+function closePhotoViewer() {
+  $('photo-lightbox').hidden = true;
+  $('lightbox-image').src = '';
+  document.body.classList.remove('lightbox-open');
+  viewerPhotos = [];
+}
+
 function openDetail(id) {
   const r = records.find(item => item.id === id);
   if (!r) return;
@@ -768,8 +810,8 @@ function openDetail(id) {
   const trailPhotos = photos.filter(p => p.category === 'trail');
   const foodPhotos = photos.filter(p => p.category === 'food');
   const fact = (label, value) => `<div class="detail-fact"><span>${label}</span><strong>${value || '—'}</strong></div>`;
-  const photoGrid = arr => arr.length ? `<div class="detail-gallery">${arr.map(p => `<img src="${esc(p.previewUrl || p.dataUrl || '')}" alt="${esc(p.caption || '산행 사진')}">`).join('')}</div>` : '<p>등록된 사진이 없습니다.</p>';
-  $('detail-content').innerHTML = `${photo ? `<div class="detail-cover"><img src="${esc(photo.previewUrl || photo.dataUrl || '')}" alt="${esc(r.name)} 대표 사진"></div>` : ''}
+  const photoGrid = arr => arr.length ? `<div class="detail-gallery">${arr.map(p => `<img class="zoomable-photo" src="${esc(p.previewUrl || p.dataUrl || '')}" alt="${esc(p.caption || '산행 사진')}" data-photo-caption="${esc(p.caption || r.name + ' 산행 사진')}" loading="lazy">`).join('')}</div>` : '<p>등록된 사진이 없습니다.</p>';
+  $('detail-content').innerHTML = `${photo ? `<div class="detail-cover"><img class="zoomable-photo" src="${esc(photo.previewUrl || photo.dataUrl || '')}" alt="${esc(r.name)} 대표 사진" data-photo-caption="${esc(r.name)} 대표 사진"></div>` : ''}
     <div class="detail-main"><div class="detail-topline"><span class="region-tag">${esc(r.region || '지역 미지정')}</span><span class="detail-date">${esc(formatDate(r.date))}</span>${r.difficulty ? `<span class="region-tag">${esc(r.difficulty)}</span>` : ''}</div>
     <h2 id="detail-title">${esc(r.name)}</h2>${mountainBadgeHtml(r, 'detail-mountain-badges')}<div class="detail-subline">${r.elevation ? `${esc(r.elevation)}m` : '정상 높이 미기록'}${r.course ? `　·　${esc(r.course)}` : ''}</div>
     <div class="detail-facts">${fact('산행 거리', r.distance ? `${esc(r.distance)}km` : '')}${fact('소요 시간', esc(r.duration))}${fact('출발 / 하산', r.startTime || r.endTime ? `${esc(r.startTime || '—')} / ${esc(r.endTime || '—')}` : '')}${fact('날씨', esc(r.weather))}</div>
