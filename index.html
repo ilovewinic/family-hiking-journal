@@ -8,11 +8,11 @@
   <title>나의 산행기록장</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=20261117-6">
+  <link rel="stylesheet" href="styles.css?v=20261117-7">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script defer src="app.js?v=20261117-6"></script>
+  <script defer src="app.js?v=20261117-7"></script>
 </head>
 <body>
   <header class="site-header">
@@ -71,11 +71,13 @@
     </section>
 
     <section class="expanded-stats-section" id="expanded-stats-section" hidden aria-label="상세 산행 통계">
-      <div class="expanded-stats-heading"><div><p class="eyebrow">HIKING BY THE NUMBERS</p><h2>차곡차곡 쌓인 산행 기록</h2><p>저장된 산행 날짜·거리·시간을 기준으로 자동 계산합니다.</p></div></div>
+      <div class="expanded-stats-heading"><div><p class="eyebrow">HIKING BY THE NUMBERS</p><h2>차곡차곡 쌓인 산행 기록</h2><p>사람을 선택하면 해당 산행 기록과 통계가 위쪽에 표시됩니다.</p></div></div>
+      <div id="stats-person-tabs" class="album-mode-tabs stats-person-tabs" aria-label="통계 대상 선택"></div>
+      <p id="stats-person-summary" class="stats-person-summary"></p>
       <div class="expanded-stats-grid" id="expanded-stats-grid"></div>
       <div class="stats-panels"><section class="stats-panel"><h3>연도별 산행 횟수</h3><div id="year-stats" class="year-stats"></div></section><section class="stats-panel"><h3>월별 산행 횟수</h3><div id="month-stats" class="month-stats"></div></section></div>
       <div class="stats-panels"><section class="stats-panel"><h3>기억에 남는 기록</h3><div id="highlight-stats" class="highlight-stats"></div></section><section class="stats-panel"><h3>자주 찾은 산</h3><div id="favorite-mountains" class="favorite-mountains"></div></section></div>
-      <div class="stats-panels participant-stats-panels"><section class="stats-panel"><h3>함께한 사람별 산행 기록</h3><p id="participant-stats-note" class="participant-stats-note"></p><div id="participant-stats" class="participant-stats"></div></section><section class="stats-panel"><h3>함께한 조합별 기록</h3><div id="combination-stats" class="combination-stats"></div></section></div>
+      <div class="stats-panels participant-stats-panels"><section class="stats-panel"><h3>사람별 산행 기록 비교</h3><p id="participant-stats-note" class="participant-stats-note"></p><div id="participant-stats" class="participant-stats"></div></section><section class="stats-panel"><h3>함께한 조합별 기록</h3><div id="combination-stats" class="combination-stats"></div></section></div>
     </section>
 
     <section class="album-section" id="album-section" hidden aria-label="연도별 가족 산행 앨범">
