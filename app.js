@@ -133,6 +133,7 @@ let albumMode = 'all';
 let albumSeason = 'all';
 let albumYear = 'all';
 let albumMonth = 'all';
+let albumPerson = 'all';
 let signedUrlRefreshTimer = null;
 
 const DB_NAME = 'my-hiking-journal-v1';
@@ -463,6 +464,7 @@ function bindEvents() {
   $('nav-album').addEventListener('click', () => setNav('album'));
   document.querySelectorAll('[data-album-mode]').forEach(btn => btn.addEventListener('click', () => { albumMode = btn.dataset.albumMode; renderAlbum(); }));
   document.querySelectorAll('[data-album-season]').forEach(btn => btn.addEventListener('click', () => { albumSeason = btn.dataset.albumSeason; renderAlbum(); }));
+  $('album-person-filter').addEventListener('change', e => { albumPerson = e.target.value; renderAlbum(); });
   $('album-year-tabs').addEventListener('click', e => { const btn=e.target.closest('[data-album-year]'); if(!btn)return; albumYear=btn.dataset.albumYear; albumMonth='all'; renderAlbum(); });
   $('album-month-tabs').addEventListener('click', e => { const btn=e.target.closest('[data-album-month]'); if(!btn)return; albumMonth=btn.dataset.albumMonth; renderAlbum(); });
   $('search-input').addEventListener('input', renderCards);
@@ -718,8 +720,33 @@ function recordCoverPhoto(record) {
   const photos = record.photos || [];
   return photos.find(p => p.isCover && p.category !== 'food' && (p.previewUrl || p.dataUrl)) || mapPhoto(record);
 }
+function getParticipantNames(record) {
+  if (!Array.isArray(record?.participants)) return [];
+  return [...new Set(record.participants.map(name => String(name || '').trim()).filter(Boolean))];
+}
+function participantNameOrder(a, b) {
+  const priority = name => ({'나':0,'수호':1,'현아':2}[name] ?? 10);
+  return priority(a) - priority(b) || a.localeCompare(b, 'ko');
+}
+function getAvailableParticipantChoices() {
+  const names = new Set(['나','수호','현아']);
+  records.forEach(record => getParticipantNames(record).forEach(name => names.add(name)));
+  return [...names].sort(participantNameOrder);
+}
+function renderParticipantOptions(selectedNames = []) {
+  const selected = new Set(selectedNames);
+  $('participant-options').innerHTML = getAvailableParticipantChoices().map(name =>
+    `<label class="participant-option"><input type="checkbox" value="${esc(name)}" ${selected.has(name) ? 'checked' : ''}><span>${esc(name)}</span></label>`
+  ).join('');
+}
+function collectParticipantNames() {
+  const selected = [...$('participant-options').querySelectorAll('input[type="checkbox"]:checked')].map(input => input.value);
+  const extra = $('field-other-participants').value.split(/[,，、;；\n]+/).map(name => name.trim()).filter(Boolean);
+  return [...new Set([...selected, ...extra])].sort(participantNameOrder);
+}
 function isFamilyRecord(record) {
-  return /가족|아들|딸|자녀|아이|부부|아빠|엄마|아내|남편|부모님|형제|자매/i.test(String(record.companions || ''));
+  const participants = getParticipantNames(record);
+  return participants.includes('수호') || participants.includes('현아');
 }
 function getSeason(date) {
   const month = Number(String(date || '').split('-')[1] || 0);
@@ -764,6 +791,42 @@ function renderAdvancedStats() {
   $('highlight-stats').innerHTML=[longest?`<p><span>가장 긴 거리</span><strong>${esc(longest.name)} · ${Number(longest.distance).toFixed(1)}km</strong></p>`:'',longestTime?`<p><span>가장 긴 산행 시간</span><strong>${esc(longestTime.name)} · ${esc(longestTime.duration || fmtDuration(durationMinutes(longestTime)))}</strong></p>`:''].filter(Boolean).join('')||'<p class="empty-help">거리와 시간이 입력된 기록이 쌓이면 표시됩니다.</p>';
   const favorites=Object.entries(mountainCounts).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'ko')).slice(0,5);
   $('favorite-mountains').innerHTML=favorites.length?favorites.map(([name,count],i)=>`<p><span>${i+1}. ${esc(name)}</span><strong>${count}회</strong></p>`).join(''):'<p class="empty-help">산행 기록을 추가하면 자주 찾은 산을 보여드립니다.</p>';
+  renderParticipantStats();
+}
+function renderParticipantStats() {
+  const fmtDuration = total => `${Math.floor(total/60)}시간 ${total%60}분`;
+  const participantNames = [...new Set(records.flatMap(getParticipantNames))].sort(participantNameOrder);
+  const missingCount = records.filter(record => getParticipantNames(record).length === 0).length;
+  $('participant-stats-note').textContent = `참여자별 거리와 시간은 해당 산행 전체 값을 각각 반영합니다. 가족 전체 통계는 산행 1건으로만 계산하며, 참여자 미기록 ${missingCount}건은 누구에게도 임의 배분하지 않습니다.`;
+  $('participant-stats').innerHTML = participantNames.length ? participantNames.map(name => {
+    const mine = records.filter(record => getParticipantNames(record).includes(name));
+    const km = mine.reduce((sum, record) => sum + (Number(record.distance) || 0), 0);
+    const timed = mine.filter(record => durationMinutes(record) > 0);
+    const minutes = timed.reduce((sum, record) => sum + durationMinutes(record), 0);
+    const mountains = new Set(mine.map(record => String(record.name || '').trim().toLocaleLowerCase('ko-KR')).filter(Boolean));
+    const longest = mine.filter(record => Number(record.distance) > 0).sort((a,b) => Number(b.distance)-Number(a.distance))[0];
+    const years = {};
+    mine.forEach(record => { if (/^\\d{4}-\\d{2}-\\d{2}$/.test(String(record.date || ''))) { const year=record.date.slice(0,4); years[year]=(years[year]||0)+1; } });
+    const yearText = Object.entries(years).sort((a,b)=>b[0].localeCompare(a[0])).map(([year,count])=>`<span><b>${esc(year)}년</b> ${count}회</span>`).join('');
+    return `<article class="participant-stat-card"><h4>${esc(name)}</h4><div class="participant-stat-metrics"><div><span>산행 횟수</span><strong>${mine.length}회</strong></div><div><span>누적 거리</span><strong>${km.toFixed(1)}km</strong></div><div><span>누적 시간</span><strong>${fmtDuration(minutes)}</strong><small>시간 기록 ${timed.length}건</small></div><div><span>다른 산</span><strong>${mountains.size}곳</strong></div><div><span>최장 산행</span><strong>${longest ? `${esc(longest.name)} · ${Number(longest.distance).toFixed(1)}km` : '—'}</strong></div></div><div class="participant-year-list"><b>연도별</b> ${yearText || '<span>날짜 기록 없음</span>'}</div></article>`;
+  }).join('') : '<p class="empty-help">참여자를 선택해 산행을 저장하면 사람별 기록이 여기에 쌓입니다.</p>';
+
+  const combinations = new Map();
+  records.forEach(record => {
+    const names = getParticipantNames(record).sort(participantNameOrder);
+    if (!names.length) return;
+    const key = names.join(' + ');
+    const current = combinations.get(key) || { count:0, km:0, minutes:0, timed:0 };
+    current.count++;
+    current.km += Number(record.distance) || 0;
+    const duration = durationMinutes(record);
+    if (duration) { current.minutes += duration; current.timed++; }
+    combinations.set(key, current);
+  });
+  const comboRows = [...combinations.entries()].sort((a,b)=>b[1].count-a[1].count || a[0].localeCompare(b[0],'ko'));
+  $('combination-stats').innerHTML = comboRows.length ? comboRows.map(([names,stats]) =>
+    `<div class="combination-stat-row"><div><strong>${esc(names)}</strong><small>${stats.km.toFixed(1)}km · ${fmtDuration(stats.minutes)}</small></div><b>${stats.count}회</b></div>`
+  ).join('') : '<p class="empty-help">참여자를 지정한 산행 기록이 쌓이면 함께한 조합도 집계됩니다.</p>';
 }
 function getAlbumYearKey(date) {
   const value=String(date||'');
@@ -783,11 +846,22 @@ function renderAlbum() {
   if (!$('album-gallery')) return;
   document.querySelectorAll('[data-album-mode]').forEach(btn=>btn.classList.toggle('selected',btn.dataset.albumMode===albumMode));
   document.querySelectorAll('[data-album-season]').forEach(btn=>btn.classList.toggle('selected',btn.dataset.albumSeason===albumSeason));
+  const albumPeople = [...new Set(records.flatMap(getParticipantNames))].sort(participantNameOrder);
+  if (albumPerson !== 'all' && albumPerson !== 'unrecorded' && !albumPeople.includes(albumPerson)) albumPerson = 'all';
+  $('album-person-filter').innerHTML = [
+    '<option value="all">전체 동행인</option>',
+    '<option value="unrecorded">동행인 미기록</option>',
+    ...albumPeople.map(name => `<option value="${esc(name)}">${esc(name)}</option>`)
+  ].join('');
+  $('album-person-filter').value = albumPerson;
 
   const list=[...records].sort((a,b)=>compareHikeRecords(a,b,'desc'));
   const items=[];
   list.forEach(record=>{
+    const participants = getParticipantNames(record);
     if(albumMode==='family'&&!isFamilyRecord(record))return;
+    if(albumPerson==='unrecorded'&&participants.length>0)return;
+    if(albumPerson!=='all'&&albumPerson!=='unrecorded'&&!participants.includes(albumPerson))return;
     if(albumSeason!=='all'&&getSeason(record.date)!==albumSeason)return;
     (record.photos||[]).filter(p=>['summit','trail'].includes(p.category)&&(p.previewUrl||p.dataUrl)).forEach(photo=>items.push({record,photo,year:getAlbumYearKey(record.date),month:getAlbumMonthKey(record.date)}));
   });
@@ -826,8 +900,9 @@ function renderAlbum() {
   $('album-count').textContent=`${visibleItems.length}장`;
   const modeLabel=albumMode==='family'?'가족과 함께한 산행':'전체 산행';
   const seasonLabel=albumSeason==='all'?'전체 계절':({spring:'봄',summer:'여름',autumn:'가을',winter:'겨울'}[albumSeason]||'전체 계절');
+  const personLabel=albumPerson==='all'?'전체 동행인':albumPerson==='unrecorded'?'동행인 미기록':albumPerson;
   const dateLabel=albumYear==='all'?'연도별 모아보기':albumYear==='unknown'?'날짜 미기록 사진':`${albumYear}년${albumMonth==='all'?'':` ${albumMonth}월`}`;
-  $('album-summary').textContent=`${modeLabel} · ${seasonLabel} · ${dateLabel} · ${visibleItems.length}장`;
+  $('album-summary').textContent=`${modeLabel} · ${personLabel} · ${seasonLabel} · ${dateLabel} · ${visibleItems.length}장`;
 
   let html='';
   if(albumYear==='all'){
@@ -899,6 +974,8 @@ function openForm(record = null) {
   $('field-difficulty').value = record?.difficulty || '';
   $('field-weather').value = record?.weather || '';
   $('field-companions').value = record?.companions || '';
+  renderParticipantOptions(record ? getParticipantNames(record) : ['나']);
+  $('field-other-participants').value = '';
   $('field-start').value = record?.startTime || '';
   $('field-end').value = record?.endTime || '';
   if (record?.startTime && record?.endTime) updateDurationPreview();
@@ -1026,11 +1103,13 @@ async function saveForm(event) {
   if (!name) { $('field-name').focus(); showToast('산 이름을 입력해 주세요.', true); return; }
   if (cloudMode && !cloudUser) { showToast('먼저 클라우드 계정에 로그인해 주세요.', true); openModal('auth-backdrop'); return; }
   const id = $('record-id').value || makeId();
+  const participantNames = collectParticipantNames();
   const record = {
     id, name, date:$('field-date').value || '', region:$('field-region').value,
     course:$('field-course').value.trim(), distance:$('field-distance').value ? Number($('field-distance').value) : '',
     duration:calculateDuration($('field-start').value, $('field-end').value) || (!$('field-start').value && !$('field-end').value ? (editingOriginal?.duration || '') : ''), elevation:$('field-elevation').value ? Number($('field-elevation').value) : '',
     difficulty:$('field-difficulty').value, weather:$('field-weather').value.trim(), companions:$('field-companions').value.trim(),
+    ...(participantNames.length || Array.isArray(editingOriginal?.participants) ? {participants:participantNames} : {}),
     startTime:$('field-start').value, endTime:$('field-end').value, memo:$('field-memo').value.trim(),
     restaurant:$('field-restaurant').value.trim(), menu:$('field-menu').value.trim(), rating:$('field-rating').value ? Number($('field-rating').value) : '',
     revisit:$('field-revisit').value, foodReview:$('field-food-review').value.trim(), photos:draftPhotos.map(p => ({...p}))
@@ -1236,6 +1315,7 @@ function openDetail(id) {
   // 상세 화면의 대표 사진은 정상 인증 사진을 우선 표시하고, 없으면 산행 사진으로 대체합니다.
   const photo = recordCoverPhoto(r);
   const photos = (r.photos || []).filter(p => p.previewUrl || p.dataUrl);
+  const participantLabel = getParticipantNames(r).length ? getParticipantNames(r).join(' · ') : '미기록';
   const summitPhotos = photos.filter(p => p.category === 'summit');
   const trailPhotos = photos.filter(p => p.category === 'trail');
   const foodPhotos = photos.filter(p => p.category === 'food');
@@ -1246,7 +1326,7 @@ function openDetail(id) {
     <div class="detail-main"><div class="detail-topline"><span class="region-tag">${esc(r.region || '지역 미지정')}</span><span class="detail-date">${esc(formatDate(r.date))}</span>${r.difficulty ? `<span class="region-tag">${esc(r.difficulty)}</span>` : ''}</div>
     <h2 id="detail-title">${esc(r.name)}</h2>${mountainBadgeHtml(r, 'detail-mountain-badges')}<div class="detail-subline">${r.elevation ? `${esc(r.elevation)}m` : '정상 높이 미기록'}${r.course ? `　·　${esc(r.course)}` : ''}</div>
     <div class="detail-facts">${fact('산행 거리', r.distance ? `${esc(r.distance)}km` : '')}${fact('소요 시간', esc(r.duration))}${fact('출발 / 하산', r.startTime || r.endTime ? `${esc(r.startTime || '—')} / ${esc(r.endTime || '—')}` : '')}${fact('날씨', esc(r.weather))}</div>
-    ${r.companions ? `<div class="detail-section"><h3>함께한 사람</h3><p>${esc(r.companions)}</p></div>` : ''}
+    <div class="detail-section"><h3>산행 참여자</h3><p>${esc(participantLabel)}</p>${r.companions ? `<p class="participant-memo"><small>동행 메모: ${esc(r.companions)}</small></p>` : ''}</div>
     <div class="detail-section"><h3>산행 후기</h3><p>${esc(r.memo || '아직 산행 후기가 없습니다.')}</p></div>
     ${summitPhotos.length ? `<div class="detail-section"><h3>정상 인증 사진 (${summitPhotos.length}장)</h3>${photoGrid(summitPhotos)}</div>` : ''}
     <div class="detail-section"><h3>산행 사진${trailPhotos.length ? ` (${trailPhotos.length}장)` : ''}</h3>${photoGrid(trailPhotos)}</div>
