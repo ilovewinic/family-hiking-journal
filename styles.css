@@ -99,3 +99,20 @@
 #profile-form{padding:20px 28px 0}
 #profile-form .form-actions{padding:17px 0 18px}
 @media(max-width:760px){#profile-form{padding:18px 18px 0}#profile-form .form-actions{padding:15px 0 18px}}
+
+/* Family album: year-first timeline navigation */
+.album-date-navigation{display:flex;align-items:flex-start;gap:12px;margin:13px 0 9px;min-width:0}
+.album-filter-label{flex:0 0 35px;padding-top:8px;font-size:10px;font-weight:800;color:#7b887d}
+.album-year-tabs,.album-month-tabs{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0}
+.album-year-tabs button,.album-month-tabs button{display:inline-flex;align-items:center;gap:7px;min-height:32px;padding:7px 11px;border:1px solid #dce6dc;border-radius:999px;background:#fff;color:#657468;font-size:10px;font-weight:750;white-space:nowrap;cursor:pointer}
+.album-year-tabs button span,.album-month-tabs button span{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:#f0f4f0;color:#879287;font-size:9px;font-variant-numeric:tabular-nums}
+.album-year-tabs button.selected,.album-month-tabs button.selected{border-color:#1d7045;background:#1d7045;color:#fff}
+.album-year-tabs button.selected span,.album-month-tabs button.selected span{background:#ffffff2a;color:#fff}
+.album-month-navigation{margin-top:2px;margin-bottom:13px}
+.album-gallery-by-year{display:block}
+.album-year-group+.album-year-group{margin-top:25px;padding-top:20px;border-top:1px solid #e1e9e0}
+.album-year-heading{display:flex;align-items:center;gap:9px;margin:0 0 12px}
+.album-year-heading h3{margin:0;color:#294c34;font-size:18px;letter-spacing:-.04em}
+.album-year-heading span{padding:4px 8px;border-radius:999px;background:#e7f1e7;color:#66806a;font-size:9px;font-weight:750}
+@media(max-width:760px){.album-date-navigation{gap:8px}.album-filter-label{flex-basis:26px;padding-top:8px}.album-year-tabs,.album-month-tabs{gap:5px}.album-year-tabs button,.album-month-tabs button{min-height:30px;padding:6px 9px;font-size:9px}.album-year-heading h3{font-size:16px}.album-year-group+.album-year-group{margin-top:20px;padding-top:16px}}
+

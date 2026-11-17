@@ -8,11 +8,11 @@
   <title>나의 산행기록장</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=20261117-4">
+  <link rel="stylesheet" href="styles.css?v=20261117-5">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script defer src="app.js?v=20261117-4"></script>
+  <script defer src="app.js?v=20261117-5"></script>
 </head>
 <body>
   <header class="site-header">
@@ -77,10 +77,12 @@
       <div class="stats-panels"><section class="stats-panel"><h3>기억에 남는 기록</h3><div id="highlight-stats" class="highlight-stats"></div></section><section class="stats-panel"><h3>자주 찾은 산</h3><div id="favorite-mountains" class="favorite-mountains"></div></section></div>
     </section>
 
-    <section class="album-section" id="album-section" hidden aria-label="계절별 가족 산행 앨범">
-      <div class="album-heading"><div><p class="eyebrow">OUR FAMILY ALBUM</p><h2>산에서 함께한 순간들</h2><p>계절과 가족 산행을 기준으로 사진을 모아봅니다.</p></div><span id="album-count" class="map-count">0장</span></div>
+    <section class="album-section" id="album-section" hidden aria-label="연도별 가족 산행 앨범">
+      <div class="album-heading"><div><p class="eyebrow">OUR FAMILY ALBUM</p><h2>산에서 함께한 순간들</h2><p>연도별로 사진을 모아보고, 특정 연도는 월별로 더 쉽게 찾아볼 수 있어요.</p></div><span id="album-count" class="map-count">0장</span></div>
       <div class="album-filters"><div class="album-mode-tabs"><button type="button" class="selected" data-album-mode="all">전체 산행</button><button type="button" data-album-mode="family">가족 산행만</button></div><div class="album-season-tabs"><button type="button" class="selected" data-album-season="all">전체 계절</button><button type="button" data-album-season="spring">봄</button><button type="button" data-album-season="summer">여름</button><button type="button" data-album-season="autumn">가을</button><button type="button" data-album-season="winter">겨울</button></div></div>
-      <p id="album-summary" class="album-summary"></p><div id="album-gallery" class="album-gallery"></div>
+      <div class="album-date-navigation"><div class="album-filter-label">연도</div><div id="album-year-tabs" class="album-year-tabs" aria-label="연도 선택"></div></div>
+      <div class="album-date-navigation album-month-navigation" id="album-month-navigation" hidden><div class="album-filter-label">월</div><div id="album-month-tabs" class="album-month-tabs" aria-label="월 선택"></div></div>
+      <p id="album-summary" class="album-summary"></p><div id="album-gallery" class="album-gallery album-gallery-by-year"></div>
     </section>
 
     <div class="notice-bar" id="storage-notice">

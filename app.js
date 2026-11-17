@@ -131,6 +131,8 @@ let hikingMap = null;
 let hikingMapLayer = null;
 let albumMode = 'all';
 let albumSeason = 'all';
+let albumYear = 'all';
+let albumMonth = 'all';
 let signedUrlRefreshTimer = null;
 
 const DB_NAME = 'my-hiking-journal-v1';
@@ -414,7 +416,7 @@ async function refreshSignedPhotoUrls() {
       } catch (err) { console.warn('사진 주소 갱신 실패:', err); }
     }
   }
-  if (changed) { renderCards(); renderHikingMap(); if (!$('detail-backdrop').hidden) { const openId = $('detail-content').dataset.recordId; if (openId) openDetail(openId); } }
+  if (changed) { renderCards(); renderAlbum(); renderHikingMap(); if (!$('detail-backdrop').hidden) { const openId = $('detail-content').dataset.recordId; if (openId) openDetail(openId); } }
 }
 
 function updateAccountDisplayName() {
@@ -461,6 +463,8 @@ function bindEvents() {
   $('nav-album').addEventListener('click', () => setNav('album'));
   document.querySelectorAll('[data-album-mode]').forEach(btn => btn.addEventListener('click', () => { albumMode = btn.dataset.albumMode; renderAlbum(); }));
   document.querySelectorAll('[data-album-season]').forEach(btn => btn.addEventListener('click', () => { albumSeason = btn.dataset.albumSeason; renderAlbum(); }));
+  $('album-year-tabs').addEventListener('click', e => { const btn=e.target.closest('[data-album-year]'); if(!btn)return; albumYear=btn.dataset.albumYear; albumMonth='all'; renderAlbum(); });
+  $('album-month-tabs').addEventListener('click', e => { const btn=e.target.closest('[data-album-month]'); if(!btn)return; albumMonth=btn.dataset.albumMonth; renderAlbum(); });
   $('search-input').addEventListener('input', renderCards);
   $('sort-select').addEventListener('change', e => { sortMode = e.target.value; renderCards(); });
   $('record-form').addEventListener('submit', saveForm);
@@ -761,20 +765,81 @@ function renderAdvancedStats() {
   const favorites=Object.entries(mountainCounts).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'ko')).slice(0,5);
   $('favorite-mountains').innerHTML=favorites.length?favorites.map(([name,count],i)=>`<p><span>${i+1}. ${esc(name)}</span><strong>${count}회</strong></p>`).join(''):'<p class="empty-help">산행 기록을 추가하면 자주 찾은 산을 보여드립니다.</p>';
 }
+function getAlbumYearKey(date) {
+  const value=String(date||'');
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.slice(0,4) : 'unknown';
+}
+function getAlbumMonthKey(date) {
+  const value=String(date||'');
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? String(Number(value.slice(5,7))) : 'unknown';
+}
+function albumPhotoCardHtml(item) {
+  const {record,photo}=item;
+  const src=photo.previewUrl||photo.dataUrl||'';
+  const alt=photo.caption||record.name||'산행 사진';
+  return `<button type="button" class="album-photo-card" data-album-record="${esc(record.id)}" aria-label="${esc(record.name)} 사진 보기"><img src="${esc(src)}" alt="${esc(alt)}" loading="lazy"><span class="album-photo-shade"><b>${esc(record.name||'이름 없는 산행')}</b><small>${esc(formatDate(record.date,'short'))}${photo.caption?` · ${esc(photo.caption)}`:''}</small></span></button>`;
+}
 function renderAlbum() {
   if (!$('album-gallery')) return;
   document.querySelectorAll('[data-album-mode]').forEach(btn=>btn.classList.toggle('selected',btn.dataset.albumMode===albumMode));
   document.querySelectorAll('[data-album-season]').forEach(btn=>btn.classList.toggle('selected',btn.dataset.albumSeason===albumSeason));
+
   const list=[...records].sort((a,b)=>compareHikeRecords(a,b,'desc'));
   const items=[];
   list.forEach(record=>{
     if(albumMode==='family'&&!isFamilyRecord(record))return;
     if(albumSeason!=='all'&&getSeason(record.date)!==albumSeason)return;
-    (record.photos||[]).filter(p=>['summit','trail'].includes(p.category)&&(p.previewUrl||p.dataUrl)).forEach(photo=>items.push({record,photo}));
+    (record.photos||[]).filter(p=>['summit','trail'].includes(p.category)&&(p.previewUrl||p.dataUrl)).forEach(photo=>items.push({record,photo,year:getAlbumYearKey(record.date),month:getAlbumMonthKey(record.date)}));
   });
-  $('album-count').textContent=`${items.length}장`;
-  $('album-summary').textContent=albumMode==='family'?'함께한 사람에 가족·자녀 등의 내용이 기록된 산행 사진입니다.':'식당 사진을 제외한 정상 인증·산행 사진을 표시합니다.';
-  $('album-gallery').innerHTML=items.length?items.map(({record,photo},i)=>`<button type="button" class="album-photo-card" data-album-record="${esc(record.id)}" aria-label="${esc(record.name)} 사진 보기"><img src="${esc(photo.previewUrl||photo.dataUrl||'')}" alt="${esc(photo.caption||record.name)}" loading="lazy"><span class="album-photo-shade"><b>${esc(record.name)}</b><small>${esc(formatDate(record.date,'short'))}${photo.caption?` · ${esc(photo.caption)}`:''}</small></span></button>`).join(''):'<div class="album-empty"><strong>아직 표시할 사진이 없습니다.</strong><span>계절이나 가족 산행 조건을 바꾸거나 산행 사진을 추가해 보세요.</span></div>';
+
+  const yearCounts=new Map();
+  items.forEach(item=>yearCounts.set(item.year,(yearCounts.get(item.year)||0)+1));
+  const years=[...yearCounts.keys()].sort((a,b)=>{
+    if(a==='unknown')return 1;
+    if(b==='unknown')return -1;
+    return b.localeCompare(a);
+  });
+  if(albumYear!=='all'&&!yearCounts.has(albumYear)){albumYear='all';albumMonth='all';}
+  $('album-year-tabs').innerHTML=[
+    `<button type="button" class="${albumYear==='all'?'selected':''}" data-album-year="all">전체 연도 <span>${items.length}</span></button>`,
+    ...years.map(year=>`<button type="button" class="${albumYear===year?'selected':''}" data-album-year="${esc(year)}">${year==='unknown'?'날짜 미기록':`${esc(year)}년`} <span>${yearCounts.get(year)}</span></button>`)
+  ].join('');
+
+  const monthNavigation=$('album-month-navigation');
+  const monthCounts=new Map();
+  if(albumYear!=='all'&&albumYear!=='unknown'){
+    items.filter(item=>item.year===albumYear).forEach(item=>monthCounts.set(item.month,(monthCounts.get(item.month)||0)+1));
+    monthNavigation.hidden=false;
+    const monthEntries=[...monthCounts.entries()].sort((a,b)=>Number(a[0])-Number(b[0]));
+    if(albumMonth!=='all'&&!monthCounts.has(albumMonth))albumMonth='all';
+    $('album-month-tabs').innerHTML=[
+      `<button type="button" class="${albumMonth==='all'?'selected':''}" data-album-month="all">전체 월 <span>${yearCounts.get(albumYear)||0}</span></button>`,
+      ...monthEntries.map(([month,count])=>`<button type="button" class="${albumMonth===month?'selected':''}" data-album-month="${month}">${month}월 <span>${count}</span></button>`)
+    ].join('');
+  } else {
+    monthNavigation.hidden=true;
+    albumMonth='all';
+    $('album-month-tabs').innerHTML='';
+  }
+
+  const visibleItems=albumYear==='all' ? items : items.filter(item=>item.year===albumYear&&(albumMonth==='all'||item.month===albumMonth));
+  $('album-count').textContent=`${visibleItems.length}장`;
+  const modeLabel=albumMode==='family'?'가족과 함께한 산행':'전체 산행';
+  const seasonLabel=albumSeason==='all'?'전체 계절':({spring:'봄',summer:'여름',autumn:'가을',winter:'겨울'}[albumSeason]||'전체 계절');
+  const dateLabel=albumYear==='all'?'연도별 모아보기':albumYear==='unknown'?'날짜 미기록 사진':`${albumYear}년${albumMonth==='all'?'':` ${albumMonth}월`}`;
+  $('album-summary').textContent=`${modeLabel} · ${seasonLabel} · ${dateLabel} · ${visibleItems.length}장`;
+
+  let html='';
+  if(albumYear==='all'){
+    html=years.map(year=>{
+      const group=items.filter(item=>item.year===year);
+      const title=year==='unknown'?'날짜 미기록':`${year}년`;
+      return `<section class="album-year-group"><div class="album-year-heading"><h3>${title}</h3><span>${group.length}장</span></div><div class="album-gallery">${group.map(albumPhotoCardHtml).join('')}</div></section>`;
+    }).join('');
+  } else {
+    html=visibleItems.length ? `<div class="album-gallery">${visibleItems.map(albumPhotoCardHtml).join('')}</div>` : '';
+  }
+  $('album-gallery').innerHTML=html||'<div class="album-empty"><strong>선택한 조건에 표시할 사진이 없습니다.</strong><span>연도·월·계절 또는 가족 산행 조건을 바꿔서 다시 찾아보세요.</span></div>';
   $('album-gallery').querySelectorAll('[data-album-record]').forEach(btn=>btn.addEventListener('click',()=>openDetail(btn.dataset.albumRecord)));
 }
 function mountainPlaceholder() {
