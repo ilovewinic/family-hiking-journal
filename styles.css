@@ -711,3 +711,227 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
 }
+
+
+/* Soft rounded typography and restaurant-first visit cards */
+:root,body,button,input,select,textarea{
+  font-family:"Nunito","Gowun Dodum","Noto Sans KR","Malgun Gothic",sans-serif;
+  letter-spacing:-.018em;
+}
+h1,h2,h3,h4,
+.brand-copy strong,
+.expanded-stats-heading h2,
+.album-heading h2,
+.map-heading h2,
+.mountain-progress-heading h2,
+.modal-header h2,
+.detail-main h2,
+.detail-section h3,
+.restaurant-panel h4,
+.empty-state h2,
+.album-year-heading h3,
+.record-card h2{
+  font-family:"Nunito","Gowun Dodum","Noto Sans KR","Malgun Gothic",sans-serif;
+  letter-spacing:-.035em;
+  font-weight:800;
+}
+.brand-copy strong{font-size:17px}
+.intro-row h1{font-size:clamp(31px,3.8vw,43px);font-weight:800}
+.card-content h2{font-size:21px;font-weight:800}
+.modal-header h2{font-size:25px}
+.detail-main h2{font-size:34px}
+.detail-section h3{font-size:16px}
+.expanded-stats-heading h2,.album-heading h2{font-size:27px}
+.stats-panel h3{font-size:15px;font-weight:800}
+.restaurant-record-card{
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  overflow:hidden;
+  border:1px solid #e5d9c5;
+  border-radius:21px;
+  background:linear-gradient(155deg,#fffdf7 0%,#f8f2e6 100%);
+  box-shadow:0 8px 23px rgba(64,54,38,.065);
+  transition:transform .24s cubic-bezier(.2,.7,.2,1),box-shadow .24s,border-color .24s;
+}
+.restaurant-record-card:hover{
+  transform:translateY(-5px);
+  border-color:#d1bd98;
+  box-shadow:0 17px 34px rgba(64,54,38,.13);
+}
+.restaurant-card-media{
+  position:relative;
+  height:clamp(165px,18vw,220px);
+  overflow:hidden;
+  background:#e9e6d8;
+}
+.restaurant-card-media>img{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  transition:transform .42s cubic-bezier(.2,.7,.2,1),filter .3s;
+  filter:saturate(.95);
+}
+.restaurant-record-card:hover .restaurant-card-media>img{transform:scale(1.045);filter:saturate(1.04)}
+.restaurant-card-placeholder{
+  display:flex;
+  height:100%;
+  width:100%;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:8px;
+  color:#77816b;
+  background:
+    radial-gradient(ellipse at 22% 25%,rgba(255,255,255,.78),transparent 45%),
+    linear-gradient(145deg,#eee9d8,#dfe7d9 55%,#e9dfc9);
+}
+.restaurant-placeholder-mark{
+  display:grid;
+  place-items:center;
+  width:58px;height:58px;
+  border:1px solid rgba(157,132,88,.32);
+  border-radius:20px;
+  background:rgba(255,251,239,.65);
+  color:#a47c4b;
+  font-size:30px;
+  box-shadow:0 6px 15px rgba(66,54,38,.08),inset 0 1px rgba(255,255,255,.8);
+}
+.restaurant-card-placeholder strong{font-size:13px;color:#526b55}
+.restaurant-card-placeholder small{font-size:10px;color:#8b8978}
+.restaurant-date-pill,.restaurant-photo-count{
+  position:absolute;
+  top:12px;
+  border:1px solid rgba(255,248,230,.35);
+  border-radius:999px;
+  background:rgba(42,61,49,.78);
+  color:#fff8e9;
+  padding:6px 10px;
+  font-size:9px;
+  font-weight:800;
+  backdrop-filter:blur(8px);
+}
+.restaurant-date-pill{left:12px}
+.restaurant-photo-count{right:12px}
+.restaurant-card-content{
+  display:flex;
+  flex:1;
+  flex-direction:column;
+  padding:16px 18px 17px;
+  min-width:0;
+}
+.restaurant-card-topline{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:8px;
+}
+.restaurant-card-index{
+  color:#a28252;
+  font-size:9px;
+  font-weight:850;
+  letter-spacing:.11em;
+}
+.restaurant-region-tag{
+  padding:5px 9px;
+  border:1px solid #e6ddcb;
+  border-radius:999px;
+  background:#f2eee2;
+  color:#7c806d;
+  font-size:9px;
+  font-weight:750;
+  white-space:nowrap;
+}
+.restaurant-card-name{
+  margin:0 0 5px;
+  color:#354e3c;
+  font-size:22px;
+  line-height:1.25;
+  overflow-wrap:anywhere;
+}
+.restaurant-card-menu{
+  margin:0;
+  color:#777667;
+  font-size:12px;
+  line-height:1.65;
+  min-height:22px;
+  overflow-wrap:anywhere;
+}
+.restaurant-card-rating-row{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:7px;
+  min-height:31px;
+  margin:10px 0 9px;
+}
+.restaurant-stars{color:#bd9254;font-size:13px;letter-spacing:.04em}
+.restaurant-card-rating-row>b{color:#8d754d;font-size:10px}
+.restaurant-unrated{color:#aaa08e;font-size:9px}
+.restaurant-revisit{
+  margin-left:auto;
+  padding:5px 8px;
+  border:1px solid #dce5d7;
+  border-radius:999px;
+  background:#eef2e8;
+  color:#5e765e;
+  font-size:9px;
+  font-weight:750;
+}
+.restaurant-card-review{
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  margin:0 0 12px;
+  color:#8a8577;
+  font-size:10px;
+  line-height:1.7;
+}
+.restaurant-card-context{
+  display:flex;
+  align-items:flex-start;
+  gap:9px;
+  margin-top:auto;
+  padding:11px 11px 10px;
+  border-top:1px solid #eae2d3;
+  border-radius:0 0 11px 11px;
+  background:rgba(241,238,225,.58);
+}
+.restaurant-mountain-mark{
+  flex:0 0 auto;
+  display:grid;
+  place-items:center;
+  width:26px;height:26px;
+  border:1px solid #dce2d4;
+  border-radius:9px;
+  background:#e8eddf;
+  color:#5c795f;
+  font-size:11px;
+}
+.restaurant-card-context>div{display:grid;gap:3px;min-width:0}
+.restaurant-card-context b{color:#536750;font-size:10px;line-height:1.4}
+.restaurant-card-context small{
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  color:#999181;
+  font-size:9px;
+  line-height:1.45;
+}
+@media(max-width:760px){
+  .restaurant-card-media{height:clamp(150px,39vw,210px)}
+  .restaurant-card-content{padding:13px 14px 14px}
+  .restaurant-card-name{font-size:19px}
+  .restaurant-card-menu{font-size:11px}
+  .restaurant-card-review{font-size:9px}
+  .restaurant-card-context{padding:9px}
+}
+@media(max-width:420px){
+  .restaurant-card-media{height:clamp(190px,58vw,245px)}
+  .restaurant-card-content{padding:14px 15px 15px}
+  .restaurant-card-name{font-size:21px}
+}
