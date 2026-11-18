@@ -1,10 +1,10 @@
 {
-  "name": "나의 산행기록장",
-  "short_name": "산행기록장",
-  "description": "산행 코스와 사진, 식당과 메뉴까지 기록하는 개인 산행 일지",
+  "name": "우리 가족 산행기록장",
+  "short_name": "가족 산행기록장",
+  "description": "우리 가족이 함께한 산행과 사진, 코스, 하산 후 맛집을 기록하는 가족 산행 일지",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#fbfcfa",
-  "theme_color": "#16794b",
+  "background_color": "#f4ecdc",
+  "theme_color": "#344f43",
   "lang": "ko-KR"
 }
