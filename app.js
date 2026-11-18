@@ -985,14 +985,56 @@ function mountainPlaceholder() {
 }
 function renderCards() {
   const list = getFilteredRecords();
-  $('results-label').textContent = `${list.length}개 기록`;
-  $('filter-label').textContent = activeRegion === 'all' ? (activeNav === 'restaurant' ? '식당 기록이 있는 산행' : '모든 산행을 표시합니다') : `${activeRegion} 지역`;
+  $('results-label').textContent = activeNav === 'restaurant' ? `${list.length}건의 식당 기록` : `${list.length}개 기록`;
+  $('filter-label').textContent = activeNav === 'restaurant'
+    ? (activeRegion === 'all' ? '산행 후 방문한 식당과 메뉴' : `${activeRegion} 지역 산행 후 방문한 식당`)
+    : (activeRegion === 'all' ? '모든 산행을 표시합니다' : `${activeRegion} 지역`);
+  $('search-input').placeholder = activeNav === 'restaurant'
+    ? '식당 이름, 메뉴, 산 이름, 후기 검색'
+    : '산 이름, 지역, 코스, 식당으로 검색';
+
   $('record-grid').innerHTML = list.map((record, listIndex) => {
     const index = listIndex + 1;
-    // 카드 대표 사진도 지도와 상세 화면처럼 정상 인증 사진을 우선 사용합니다.
+    const date = record.date ? formatDate(record.date, 'short') : '날짜 미기록';
+
+    if (activeNav === 'restaurant') {
+      const foodPhotos = (record.photos || []).filter(photo => photo.category === 'food' && (photo.previewUrl || photo.dataUrl));
+      const foodPhoto = foodPhotos[0] || null;
+      const rating = Math.max(0, Math.min(5, Number(record.rating) || 0));
+      const stars = rating ? '★'.repeat(rating) + '☆'.repeat(5-rating) : '';
+      const visitMountain = record.name || '산행 정보 미기록';
+      const visitCourse = record.course || '';
+      const restaurantName = record.restaurant || '식당 이름 미기록';
+      const menu = record.menu || '메뉴를 아직 기록하지 않았습니다.';
+      const review = record.foodReview || '';
+      return `<article class="record-card restaurant-record-card" data-open-record="${esc(record.id)}" tabindex="0" role="button" aria-label="${esc(restaurantName)} 식당 기록 보기">
+        <div class="restaurant-card-media">
+          ${foodPhoto
+            ? `<img src="${esc(foodPhoto.previewUrl || foodPhoto.dataUrl || '')}" alt="${esc(foodPhoto.caption || restaurantName + ' 음식 사진')}" loading="lazy">`
+            : `<div class="restaurant-card-placeholder"><span class="restaurant-placeholder-mark">♨</span><strong>맛있는 산행의 기억</strong><small>음식 사진을 추가해 보세요</small></div>`}
+          <span class="restaurant-date-pill">${esc(date)}</span>
+          ${foodPhotos.length > 1 ? `<span class="restaurant-photo-count">음식 사진 ${foodPhotos.length}장</span>` : ''}
+        </div>
+        <div class="restaurant-card-content">
+          <div class="restaurant-card-topline"><span class="restaurant-card-index">${String(index).padStart(2,'0')} · AFTER HIKE</span><span class="restaurant-region-tag">${esc(record.region || '지역 미지정')}</span></div>
+          <h2 class="restaurant-card-name">${esc(restaurantName)}</h2>
+          <p class="restaurant-card-menu">${esc(menu)}</p>
+          <div class="restaurant-card-rating-row">
+            ${rating ? `<span class="restaurant-stars" aria-label="만족도 ${rating}점">${stars}</span><b>${rating} / 5</b>` : '<span class="restaurant-unrated">아직 평점이 없습니다</span>'}
+            ${record.revisit ? `<span class="restaurant-revisit">${esc(record.revisit)}</span>` : ''}
+          </div>
+          ${review ? `<p class="restaurant-card-review">${esc(review)}</p>` : ''}
+          <div class="restaurant-card-context">
+            <span class="restaurant-mountain-mark">▲</span>
+            <div><b>${esc(visitMountain)} 산행 후</b>${visitCourse ? `<small>${esc(visitCourse)}</small>` : '<small>산행 코스 미기록</small>'}</div>
+          </div>
+        </div>
+      </article>`;
+    }
+
+    // 산행 카드의 대표 사진은 정상 인증 사진을 우선 사용합니다.
     const photo = recordCoverPhoto(record);
     const numPhotos = (record.photos || []).length;
-    const date = record.date ? formatDate(record.date, 'short') : '날짜 미기록';
     const intro = record.course || record.memo || '산행 코스와 후기를 기록해 보세요.';
     const stats = [record.distance ? `${esc(record.distance)}km` : '', record.duration ? esc(record.duration) : ''].filter(Boolean).join(' · ');
     return `<article class="record-card" data-open-record="${esc(record.id)}" tabindex="0" role="button" aria-label="${esc(record.name)} 산행 기록 보기">
@@ -1002,6 +1044,7 @@ function renderCards() {
       ${record.restaurant ? `<div class="card-footer"><span class="mini-icon">✦</span><span class="restaurant-teaser">${esc(record.restaurant)}${record.menu ? ` · ${esc(record.menu)}` : ''}</span></div>` : (stats ? `<div class="card-footer"><span>↗</span><span>${stats}</span></div>` : '')}</div>
     </article>`;
   }).join('');
+
   $('record-grid').querySelectorAll('[data-open-record]').forEach(card => {
     const open = () => openDetail(card.dataset.openRecord);
     card.addEventListener('click', open);
@@ -1011,8 +1054,13 @@ function renderCards() {
   $('empty-state').hidden = nonListPage || list.length > 0;
   $('record-grid').hidden = nonListPage || list.length === 0;
   if (!records.length) {
-    $('empty-title').textContent = '첫 산행을 기록해 보세요';
-    $('empty-copy').textContent = '사진 한 장으로 시작해도 좋아요. 산행 정보와 하산 후 식당까지 한곳에 모아둘 수 있습니다.';
+    $('empty-title').textContent = activeNav === 'restaurant' ? '첫 맛집 기록을 남겨보세요' : '첫 산행을 기록해 보세요';
+    $('empty-copy').textContent = activeNav === 'restaurant'
+      ? '산행 후 방문한 식당과 메뉴, 만족도를 기록하면 이곳에 식당 카드로 모아집니다.'
+      : '사진 한 장으로 시작해도 좋아요. 산행 정보와 하산 후 식당까지 한곳에 모아둘 수 있습니다.';
+  } else if (activeNav === 'restaurant') {
+    $('empty-title').textContent = '아직 등록된 맛집 기록이 없습니다';
+    $('empty-copy').textContent = '산행 기록에 식당 이름과 메뉴를 추가하면 이곳에 맛집 카드가 만들어집니다.';
   } else {
     $('empty-title').textContent = '조건에 맞는 기록이 없습니다';
     $('empty-copy').textContent = '검색어나 지역 필터를 바꿔서 다시 찾아보세요.';
