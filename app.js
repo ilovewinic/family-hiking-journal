@@ -208,8 +208,16 @@ function cleanPhoto(photo) {
   if (photo.originalName) out.originalName = photo.originalName;
   return out;
 }
+function normalizeParticipantName(value) {
+  const name = String(value || '').trim();
+  // 기존 기록의 '나'는 이제 가족 기록장의 '아빠'와 같은 사람으로 취급합니다.
+  return name === '나' ? '아빠' : name;
+}
 function cleanRecord(record) {
   const out = { ...record };
+  if (Array.isArray(record.participants)) {
+    out.participants = [...new Set(record.participants.map(normalizeParticipantName).filter(Boolean))].sort(participantNameOrder);
+  }
   out.photos = (record.photos || []).map(cleanPhoto);
   delete out.previewUrl;
   return out;
@@ -518,7 +526,7 @@ function setNav(nav) {
   $('nav-restaurant').classList.toggle('active', nav === 'restaurant');
   $('nav-stats').classList.toggle('active', nav === 'stats');
   $('nav-album').classList.toggle('active', nav === 'album');
-  $('page-title').textContent = nav === 'restaurant' ? '산행 맛집 기록' : nav === 'stats' ? '나의 산행 통계' : nav === 'album' ? '가족 산행 앨범' : '전체 산행 기록';
+  $('page-title').textContent = nav === 'restaurant' ? '산행 맛집 기록' : nav === 'stats' ? '가족 산행 통계' : nav === 'album' ? '가족 산행 앨범' : '전체 산행 기록';
   $('page-subtitle').textContent = nav === 'restaurant'
     ? '산행 후 들른 식당과 먹었던 메뉴를 모아보세요.'
     : nav === 'stats' ? '누적 거리와 시간, 연도별·월별 산행을 돌아보세요.'
@@ -729,14 +737,14 @@ function recordCoverPhoto(record) {
 }
 function getParticipantNames(record) {
   if (!Array.isArray(record?.participants)) return [];
-  return [...new Set(record.participants.map(name => String(name || '').trim()).filter(Boolean))];
+  return [...new Set(record.participants.map(normalizeParticipantName).filter(Boolean))];
 }
 function participantNameOrder(a, b) {
-  const priority = name => ({'나':0,'수호':1,'현아':2}[name] ?? 10);
+  const priority = name => ({'아빠':0,'수호':1,'현아':2}[name] ?? 10);
   return priority(a) - priority(b) || a.localeCompare(b, 'ko');
 }
 function getAvailableParticipantChoices() {
-  const names = new Set(['나','수호','현아']);
+  const names = new Set(['아빠','수호','현아']);
   records.forEach(record => getParticipantNames(record).forEach(name => names.add(name)));
   return [...names].sort(participantNameOrder);
 }
@@ -748,7 +756,7 @@ function renderParticipantOptions(selectedNames = []) {
 }
 function collectParticipantNames() {
   const selected = [...$('participant-options').querySelectorAll('input[type="checkbox"]:checked')].map(input => input.value);
-  const extra = $('field-other-participants').value.split(/[,，、;；\n]+/).map(name => name.trim()).filter(Boolean);
+  const extra = $('field-other-participants').value.split(/[,，、;；\n]+/).map(normalizeParticipantName).filter(Boolean);
   return [...new Set([...selected, ...extra])].sort(participantNameOrder);
 }
 function isFamilyRecord(record) {
@@ -1085,7 +1093,7 @@ function openForm(record = null) {
   $('field-difficulty').value = record?.difficulty || '';
   $('field-weather').value = record?.weather || '';
   $('field-companions').value = record?.companions || '';
-  renderParticipantOptions(record ? getParticipantNames(record) : ['나']);
+  renderParticipantOptions(record ? getParticipantNames(record) : ['아빠']);
   $('field-other-participants').value = '';
   $('field-start').value = record?.startTime || '';
   $('field-end').value = record?.endTime || '';
@@ -1517,10 +1525,10 @@ async function exportBackup() {
       }
       backupRecords.push(copy);
     }
-    const payload = { app:'나의 산행기록장', version:2, exportedAt:new Date().toISOString(), photoMode: cloudMode ? 'cloud' : 'local', records:backupRecords };
+    const payload = { app:'우리 가족 산행기록장', version:2, exportedAt:new Date().toISOString(), photoMode: cloudMode ? 'cloud' : 'local', records:backupRecords };
     const blob = new Blob([JSON.stringify(payload)], {type:'application/json;charset=utf-8'});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `산행기록장_백업_${dateForInput()}.json`; document.body.appendChild(a); a.click(); a.remove();
+    const a = document.createElement('a'); a.href = url; a.download = `우리_가족_산행기록장_백업_${dateForInput()}.json`; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
     const noPhoto = backupRecords.reduce((sum,r) => sum + (r.photos || []).filter(p => !p.dataUrl).length, 0);
     const noOriginal = backupRecords.reduce((sum,r) => sum + (r.photos || []).filter(p => p.originalPath && !p.originalDataUrl).length, 0);
